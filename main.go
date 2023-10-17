@@ -16,10 +16,22 @@ func main() {
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	var keyboard = tgbotapi.NewReplyKeyboard(
+	var kbrdMain = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Вызвать курьера"),
 			tgbotapi.NewKeyboardButton("Статус заказа")),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Написать оператору"),
+			tgbotapi.NewKeyboardButton("Позвонить в офис"),
+			tgbotapi.NewKeyboardButton("Записаться в Сервис")),
+	)
+
+	var kbrdYN = tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Я представляю учреждение"),
+			tgbotapi.NewKeyboardButton("Нет, я не учреждение")),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Назад")),
 	)
 
 	u := tgbotapi.NewUpdate(0)
@@ -36,9 +48,34 @@ func main() {
 
 		switch update.Message.Text {
 		case "/start":
-			msg.ReplyMarkup = keyboard
+			msg.ReplyMarkup = kbrdMain
 		case "/close":
 			msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+
+		}
+
+		switch update.Message.Text {
+		//case "Вызвать курьера":
+		//	msg.Text = "Извините, эта функция еще в разработке"
+		case "Статус заказа":
+			msg.Text = "Извините, эта функция еще в разработке"
+		case "Написать оператору":
+			msg.Text = "Перейти в чат с оператором: @ultrafilaret  (https://t.me/ultrafilaret)"
+		case "Позвонить в офис":
+			msg.Text = "Для связи с офисом позвоните, пожалуйста, по этому номеру +79045340560"
+		case "Записаться в Сервис":
+			msg.Text = "Извините, эта функция еще в разработке"
+		}
+
+		switch update.Message.Text {
+		case "Вызвать курьера":
+			msg.ReplyMarkup = kbrdYN
+		case "Я представляю учреждение":
+			msg.Text = "Укажите наименование учреждения"
+		case "Нет, я не учреждение":
+			msg.Text = "Извините, эта функция еще в разработке"
+		case "Назад":
+			msg.ReplyMarkup = kbrdMain
 		}
 
 		if _, err := bot.Send(msg); err != nil {
