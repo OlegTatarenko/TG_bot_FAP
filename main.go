@@ -1,6 +1,7 @@
 package main
 
 import (
+	"TG_bot_FAP/perm"
 	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -18,25 +19,25 @@ func main() {
 
 	var kbrdMain = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("🏃Вызвать курьера"),
-			tgbotapi.NewKeyboardButton("❓Статус заказа")),
+			tgbotapi.NewKeyboardButton(perm.GetCourier),
+			tgbotapi.NewKeyboardButton(perm.OrderStatus)),
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("✏Написать менеджеру"),
-			tgbotapi.NewKeyboardButton("📞Позвонить в офис"),
-			tgbotapi.NewKeyboardButton("🔧Записаться в Сервис")),
+			tgbotapi.NewKeyboardButton(perm.WriteToManager),
+			tgbotapi.NewKeyboardButton(perm.CallTheOffice),
+			tgbotapi.NewKeyboardButton(perm.RecordInService)),
 	)
 
-	var kbrdYN = tgbotapi.NewReplyKeyboard(
+	var kbrdYNOrg = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Я представляю учреждение🏢"),
-			tgbotapi.NewKeyboardButton("Нет, я не учреждение🙂")),
+			tgbotapi.NewKeyboardButton(perm.Organization),
+			tgbotapi.NewKeyboardButton(perm.NotOrganization)),
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Назад🔙")),
+			tgbotapi.NewKeyboardButton(perm.Back)),
 	)
 
 	var btnURL = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("➡Нажмите для перехода в чат⬅", "https://t.me/ultrafilaret"),
+			tgbotapi.NewInlineKeyboardButtonURL(perm.GoToChat, perm.ChatURL),
 		),
 	)
 
@@ -61,25 +62,24 @@ func main() {
 		}
 
 		switch update.Message.Text {
-		case "❓Статус заказа":
-			msg.Text = "Извините, эта функция еще в разработке🤷‍♂️"
-		case "✏Написать менеджеру":
+		case perm.OrderStatus:
+			msg.Text = perm.InDev
+		case perm.WriteToManager:
 			msg.ReplyMarkup = btnURL
-			//msg.Text = "Перейти в чат с оператором: @ultrafilaret  (https://t.me/ultrafilaret)"
-		case "📞Позвонить в офис":
-			msg.Text = "Для связи с офисом позвоните, пожалуйста, по этому номеру +79045340560"
-		case "🔧Записаться в Сервис":
-			msg.Text = "Извините, эта функция еще в разработке🤷‍♂️"
+		case perm.CallTheOffice:
+			msg.Text = perm.CallThisNumber
+		case perm.RecordInService:
+			msg.Text = perm.InDev
 		}
 
 		switch update.Message.Text {
-		case "🏃Вызвать курьера":
-			msg.ReplyMarkup = kbrdYN
-		case "Я представляю учреждение🏢":
-			msg.Text = "Укажите наименование учреждения"
-		case "Нет, я не учреждение🙂":
-			msg.Text = "Извините, эта функция еще в разработке🤷‍♂️"
-		case "Назад🔙":
+		case perm.GetCourier:
+			msg.ReplyMarkup = kbrdYNOrg
+		case perm.Organization:
+			msg.Text = perm.NameOfTheOrganization
+		case perm.NotOrganization:
+			msg.Text = perm.InDev
+		case perm.Back:
 			msg.ReplyMarkup = kbrdMain
 		}
 
