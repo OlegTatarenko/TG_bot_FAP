@@ -3,6 +3,7 @@ package main
 import (
 	"TG_bot_FAP/perm"
 	"log"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -18,38 +19,35 @@ var (
 			tgbotapi.NewKeyboardButton(perm.GetCourier),
 			tgbotapi.NewKeyboardButton(perm.RecordInService)),
 	)
-	/*
-		kbrdYNOrg = tgbotapi.NewReplyKeyboard(
-			tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(perm.Organization),
-				tgbotapi.NewKeyboardButton(perm.NotOrganization)),
-			tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(perm.Back)),
-		)
-	*/
 	btnURL = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL(perm.GoToChat, perm.ChatURL),
 		))
-
 	kbrdYNOrg = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(perm.Organization, perm.Organization),
 			tgbotapi.NewInlineKeyboardButtonData(perm.NotOrganization, perm.NotOrganization),
 		))
-	numericKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+	kbrdNmbPhn = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("Google", "https://www.google.ru/"),
-			tgbotapi.NewInlineKeyboardButtonData("2", "2"),
-			tgbotapi.NewInlineKeyboardButtonData("3", "3"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("4", "4"),
-			tgbotapi.NewInlineKeyboardButtonData("5", "5"),
-			tgbotapi.NewInlineKeyboardButtonData("6", "6"),
-		),
-	)
+			tgbotapi.NewInlineKeyboardButtonData("Указать свой номер", "Указать свой номер"),
+			tgbotapi.NewInlineKeyboardButtonData("Ввести номер вручную", "Ввести номер вручную"),
+		))
 )
+
+// Счетчик для вывода инлайн-кнопок и записи данных пользователя
+var i = 0
+
+// Массив для записи информации клиента при вызове курьера
+var ClientForm = []string{
+	"Вы ввели следующие данные: ",
+	"Наименование учреждения: ",
+	"Адрес, где забрать: ",
+	"Имя контактно лица: ",
+	"Контактный телефон: ",
+	"Цель вызова курьера: ",
+	"Дата, время приезда курьера: ",
+}
 
 func main() {
 	bot, err := tgbotapi.NewBotAPI(perm.Token)
@@ -74,6 +72,40 @@ func main() {
 			// the text that we received.
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 
+			switch i {
+			case 1:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = perm.Adress
+				i++
+			case 2:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Укажите имя контактного лица"
+				i++
+			case 3:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Введите ваш номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
+				//msg.ReplyMarkup = kbrdNmbPhn
+				i++
+			case 4:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
+					"\n1) Забрать картриджи, заправить, вернуть." +
+					"\n2) Купить 1 новый картридж ce285a и выставить счет." +
+					"\n3) После заправки привезти акт сверки и новый счет." +
+					"\n4) Забрать подписанный договор." +
+					"\n...или ваш вариант"
+				i++
+			case 5:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Укажите удобную дату и время приезда курьера"
+				i++
+			case 6:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				//"Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки.\n " +
+				msg.Text = strings.Join(ClientForm, " ")
+				i = 0
+			}
+
 			// If the message was open, add a copy of our numeric keyboard.
 			switch update.Message.Text {
 			case "/start":
@@ -93,8 +125,8 @@ func main() {
 				msg.ReplyMarkup = kbrdYNOrg
 			case perm.RecordInService:
 				msg.Text = perm.InDev
-			default:
-				msg.Text = "Я тебя не понимаю"
+				//default:
+				//	msg.Text = "Я тебя не понимаю"
 			}
 
 			// Send the message.
@@ -108,11 +140,21 @@ func main() {
 			if _, err := bot.Request(callback); err != nil {
 				panic(err)
 			}
-
 			// And finally, send a message containing the data received.
 			msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Data)
+
+			switch update.CallbackQuery.Data {
+			case perm.Organization:
+				msg.Text = perm.NameOfTheOrganization
+				i = 1
+			case perm.NotOrganization:
+				msg.Text = perm.Adress
+				i = 2
+			}
+
 			if _, err := bot.Send(msg); err != nil {
 				panic(err)
+
 			}
 		}
 	}
