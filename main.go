@@ -19,6 +19,11 @@ var (
 			tgbotapi.NewKeyboardButton(perm.GetCourier),
 			tgbotapi.NewKeyboardButton(perm.RecordInService)),
 	)
+
+	btnContact = tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButtonContact(perm.Contact)))
+
 	btnURL = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL(perm.GoToChat, perm.ChatURL),
@@ -28,26 +33,15 @@ var (
 			tgbotapi.NewInlineKeyboardButtonData(perm.Organization, perm.Organization),
 			tgbotapi.NewInlineKeyboardButtonData(perm.NotOrganization, perm.NotOrganization),
 		))
-	kbrdNmbPhn = tgbotapi.NewInlineKeyboardMarkup(
+	kbrdYN = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Указать свой номер", "Указать свой номер"),
-			tgbotapi.NewInlineKeyboardButtonData("Ввести номер вручную", "Ввести номер вручную"),
+			tgbotapi.NewInlineKeyboardButtonData(perm.Yes, perm.Yes),
+			tgbotapi.NewInlineKeyboardButtonData(perm.No, perm.No),
 		))
 )
 
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
 var i = 0
-
-// Массив для записи информации клиента при вызове курьера
-var ClientForm = []string{
-	"Вы ввели следующие данные: ",
-	"Наименование учреждения: ",
-	"Адрес, где забрать: ",
-	"Имя контактно лица: ",
-	"Контактный телефон: ",
-	"Цель вызова курьера: ",
-	"Дата, время приезда курьера: ",
-}
 
 func main() {
 	bot, err := tgbotapi.NewBotAPI(perm.Token)
@@ -64,6 +58,9 @@ func main() {
 
 	updates := bot.GetUpdatesChan(updateConfig)
 
+	// Срез для записи информации клиента при вызове курьера
+	ClientForm := perm.Form
+
 	// Loop through each update.
 	for update := range updates {
 		// Check if we've gotten a message update.
@@ -72,41 +69,7 @@ func main() {
 			// the text that we received.
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 
-			switch i {
-			case 1:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = perm.Adress
-				i++
-			case 2:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Укажите имя контактного лица"
-				i++
-			case 3:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Введите ваш номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
-				//msg.ReplyMarkup = kbrdNmbPhn
-				i++
-			case 4:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
-					"\n1) Забрать картриджи, заправить, вернуть." +
-					"\n2) Купить 1 новый картридж ce285a и выставить счет." +
-					"\n3) После заправки привезти акт сверки и новый счет." +
-					"\n4) Забрать подписанный договор." +
-					"\n...или ваш вариант"
-				i++
-			case 5:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Укажите удобную дату и время приезда курьера"
-				i++
-			case 6:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				//"Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки.\n " +
-				msg.Text = strings.Join(ClientForm, " ")
-				i = 0
-			}
-
-			// If the message was open, add a copy of our numeric keyboard.
+			// Реакция на нажатия кнопок главного меню
 			switch update.Message.Text {
 			case "/start":
 				msg.Text = "Воспользуйтесь моей встроенной клавиатурой"
@@ -121,12 +84,53 @@ func main() {
 			case perm.CallTheOffice:
 				msg.Text = perm.CallThisNumber
 			case perm.GetCourier:
-				msg.Text = "Вы представляете учреждение?"
+				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
 			case perm.RecordInService:
 				msg.Text = perm.InDev
 				//default:
 				//	msg.Text = "Я тебя не понимаю"
+			}
+
+			// Опрос клиента после нажатия кнопки Вызвать курьера
+			switch i {
+			case 1:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = perm.Adress
+				i++ //2
+			case 2:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Укажите имя контактного лица"
+				i++ //3
+			case 3:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
+				msg.ReplyMarkup = btnContact
+				i++ //4
+			case 4:
+				msg.ReplyMarkup = kbrdMain
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
+					"\n1) Забрать картриджи, заправить, вернуть." +
+					"\n2) Купить 1 новый картридж ce285a и выставить счет." +
+					"\n3) После заправки привезти акт сверки и новый счет." +
+					"\n4) Забрать подписанный договор." +
+					"\n...или ваш вариант"
+				i++ //5
+			case 5:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = "Укажите удобную дату и время приезда курьера"
+				i++ //6
+			case 6:
+				ClientForm[i] = ClientForm[i] + msg.Text
+				msg.Text = strings.Join(ClientForm, "\n") + "\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
+				msg.ReplyMarkup = kbrdYN
+				i++ //7
+			case 7:
+				msg.ReplyMarkup = kbrdMain
+				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки.\n "
+				i = 0
+				ClientForm = perm.Form
 			}
 
 			// Send the message.
@@ -150,12 +154,25 @@ func main() {
 			case perm.NotOrganization:
 				msg.Text = perm.Adress
 				i = 2
+			case perm.Yes:
+				ClientForm = perm.Form
+				msg.ReplyMarkup = kbrdMain
+				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
+				i = 0
+			case perm.No:
+				ClientForm = perm.Form
+				msg.Text = perm.AreYouOrg
+				msg.ReplyMarkup = kbrdYNOrg
+				i = 0
 			}
 
 			if _, err := bot.Send(msg); err != nil {
 				panic(err)
 
 			}
+		}
+		if i == 0 {
+			ClientForm = perm.Form
 		}
 	}
 }
