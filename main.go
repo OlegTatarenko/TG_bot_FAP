@@ -63,36 +63,9 @@ func main() {
 
 	// Loop through each update.
 	for update := range updates {
-		// Check if we've gotten a message update.
-		if update.Message != nil {
-			// Construct a new message from the given chat ID and containing
-			// the text that we received.
+		// Опрос клиента после нажатия кнопки Вызвать курьера, т.е. при условии, что i > 0
+		if i > 0 && update.Message != nil {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-
-			// Реакция на нажатия кнопок главного меню
-			switch update.Message.Text {
-			case "/start":
-				msg.Text = "Воспользуйтесь моей встроенной клавиатурой"
-				msg.ReplyMarkup = kbrdMain
-			case "/close":
-				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-			case perm.OrderStatus:
-				msg.Text = perm.InDev
-			case perm.WriteToManager:
-				msg.Text = "Нажмите эту кнопку для перехода в чат с менеджером"
-				msg.ReplyMarkup = btnURL
-			case perm.CallTheOffice:
-				msg.Text = perm.CallThisNumber
-			case perm.GetCourier:
-				msg.Text = perm.AreYouOrg
-				msg.ReplyMarkup = kbrdYNOrg
-			case perm.RecordInService:
-				msg.Text = perm.InDev
-				//default:
-				//	msg.Text = "Я тебя не понимаю"
-			}
-
-			// Опрос клиента после нажатия кнопки Вызвать курьера
 			switch i {
 			case 1:
 				ClientForm[i] = ClientForm[i] + msg.Text
@@ -132,12 +105,43 @@ func main() {
 				i = 0
 				ClientForm = perm.Form
 			}
+			if _, err = bot.Send(msg); err != nil {
+				panic(err)
+			}
+		} else if update.Message != nil {
+			// Construct a new message from the given chat ID and containing
+			// the text that we received.
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+
+			// Реакция на нажатия кнопок главного меню
+			switch update.Message.Text {
+			case "/start":
+				msg.Text = "Воспользуйтесь моей встроенной клавиатурой"
+				msg.ReplyMarkup = kbrdMain
+			case "/close":
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+			case perm.OrderStatus:
+				msg.Text = perm.InDev
+			case perm.WriteToManager:
+				msg.Text = "Нажмите эту кнопку для перехода в чат с менеджером"
+				msg.ReplyMarkup = btnURL
+			case perm.CallTheOffice:
+				msg.Text = perm.CallThisNumber
+			case perm.GetCourier:
+				msg.Text = perm.AreYouOrg
+				msg.ReplyMarkup = kbrdYNOrg
+			case perm.RecordInService:
+				msg.Text = perm.InDev
+			default:
+				msg.Text = "Я тебя не понимаю"
+			}
 
 			// Send the message.
 			if _, err = bot.Send(msg); err != nil {
 				panic(err)
 			}
-		} else if update.CallbackQuery != nil {
+		}
+		if update.CallbackQuery != nil {
 			// Respond to the callback query, telling Telegram to show the user
 			// a message with the data received.
 			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
