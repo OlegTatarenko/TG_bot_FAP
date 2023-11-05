@@ -43,6 +43,57 @@ var (
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
 var i = 0
 
+// Хеш-таблица для хранения данных ползвателей
+var Forms = make(map[int64]UserData)
+
+// Структура для записи данных пользоватея при вызове курера или при записи на сервис
+type UserData struct {
+	UserID           int64
+	DataGetCourier   Blank
+	DataRecInService string
+	Index            int
+}
+
+type Blank struct {
+	Intro   string
+	Org     string
+	Address string
+	Person  string
+	Phone   string
+	Purpose string
+	Time    string
+}
+
+var UD = UserData{
+	0,
+	B,
+	"",
+	0,
+}
+
+var B = Blank{
+	"Спасибо! Вы ввели следующие данные: ",
+	"Учреждение (если применимо): ",
+	"Адрес, где забрать: ",
+	"Контактное лицо: ",
+	"Контактный телефон: ",
+	"Цель вызова курьера: ",
+	"Дата, время приезда курьера: ",
+}
+
+func WriteUD(ID int64, i int) () {
+	if _, ok := Forms[ID]; !ok {
+		//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поля ID и индекс
+		UD.UserID = ID
+		UD.Index = i
+		Forms[ID] = UD
+	} else {
+		//если есть ключ, равный ID, то записываем в соотв. поля ID и индекс
+		UD.UserID = ID
+		UD.Index = i
+	}
+}
+
 func main() {
 	bot, err := tgbotapi.NewBotAPI(perm.Token)
 	if err != nil {
@@ -154,15 +205,21 @@ func main() {
 			switch update.CallbackQuery.Data {
 			case perm.Organization:
 				msg.Text = perm.NameOfTheOrganization
+				ID := update.CallbackQuery.Message.Chat.ID
 				i = 1
+				func WriteUD(ID, i)
 			case perm.NotOrganization:
 				msg.Text = perm.Adress
+				ID := update.CallbackQuery.Message.Chat.ID
 				i = 2
+				func WriteUD(ID, i)
 			case perm.Yes:
 				ClientForm = perm.Form
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
+				ID := update.CallbackQuery.Message.Chat.ID
 				i = 0
+				func WriteUD(ID, i)
 			case perm.No:
 				ClientForm = perm.Form
 				msg.Text = perm.AreYouOrg

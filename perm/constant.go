@@ -42,34 +42,3 @@ var Form = []string{
 	"Цель вызова курьера: ",
 	"Дата, время приезда курьера: ",
 }
-
-// Хеш-таблица для хранения данных ползвателей
-var Forms map[int64]UserData
-
-// Структура для записи данных пользоватея при вызове курера или при записи на сервис
-type UserData struct {
-	UserID           int64
-	DataGetCourier   Blank
-	DataRecInService string
-	Index            int
-}
-
-type Blank struct {
-	Intro   string
-	Org     string
-	Address string
-	Person  string
-	Phone   string
-	Purpose string
-	Time    string
-}
-
-var B = Blank{
-	"Спасибо! Вы ввели следующие данные: ",
-	"Учреждение (если применимо): ",
-	"Адрес, где забрать: ",
-	"Контактное лицо: ",
-	"Контактный телефон: ",
-	"Цель вызова курьера: ",
-	"Дата, время приезда курьера: ",
-}
