@@ -2,10 +2,8 @@ package main
 
 import (
 	"TG_bot_FAP/perm"
-	"log"
-	"strings"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"log"
 )
 
 var (
@@ -43,10 +41,10 @@ var (
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
 var i = 0
 
-// Хеш-таблица для хранения данных ползвателей
+// Forms хеш-таблица для хранения данных пользователей
 var Forms = make(map[int64]UserData)
 
-// Структура для записи данных пользоватея при вызове курера или при записи на сервис
+// UserData структура для записи данных пользователя при вызове курьера или при записи на сервис
 type UserData struct {
 	UserID           int64
 	DataGetCourier   Blank
@@ -54,6 +52,7 @@ type UserData struct {
 	Index            int
 }
 
+// Blank структура для записи данных пользователя при вызове курьера
 type Blank struct {
 	Intro   string
 	Org     string
@@ -81,17 +80,22 @@ var B = Blank{
 	"Дата, время приезда курьера: ",
 }
 
-func WriteUD(ID int64, i int) () {
+// WriteUDStart функция для создания записи ползователя в мапе с ID ползователя
+func WriteUDStart(ID int64) {
 	if _, ok := Forms[ID]; !ok {
-		//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поля ID и индекс
+		//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
 		UD.UserID = ID
-		UD.Index = i
 		Forms[ID] = UD
-	} else {
-		//если есть ключ, равный ID, то записываем в соотв. поля ID и индекс
-		UD.UserID = ID
-		UD.Index = i
 	}
+}
+
+// WriteUDIndex функция для изменения индекса в данных пользователя
+func WriteUDIndex(ID int64) {
+	//переменная с копией структуры, чтобы обратиться к полю структуры внутри мапы, т.к. обращение через Forms[ID].index = i языком не предусмотрено
+	//изменяем счетчик и записываем его в index
+	temp := Forms[ID]
+	temp.Index = i
+	Forms[ID] = temp
 }
 
 func main() {
@@ -110,51 +114,87 @@ func main() {
 	updates := bot.GetUpdatesChan(updateConfig)
 
 	// Срез для записи информации клиента при вызове курьера
-	ClientForm := perm.Form
+	//ClientForm := perm.Form
 
 	// Loop through each update.
 	for update := range updates {
+
+		// Создаем запись о пользователе в мапе, если записи не существует
+		ID := update.Message.Chat.ID
+		Text := update.Message.Text
+		WriteUDStart(ID)
+		//переменная с копией структуры, чтобы получить значение поля структуры из мапы, т.к. обращение через Forms[ID].index > 0 языком не предусмотрено
+		ind := Forms[ID].Index
+
 		// Опрос клиента после нажатия кнопки Вызвать курьера, т.е. при условии, что i > 0
-		if i > 0 && update.Message != nil {
+		if ind > 0 && update.Message != nil {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-			switch i {
+			switch ind {
 			case 1:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = perm.Adress
+				//записываем полученное наименование организации в поле Org
+				temp := Forms[ID]
+				temp.DataGetCourier.Org = temp.DataGetCourier.Org + Text
+				Forms[ID] = temp
 				i++ //2
+				WriteUDIndex(ID)
+				msg.Text = perm.Adress
 			case 2:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Укажите имя контактного лица"
+				//записываем полученный адрес в поле Address
+				temp := Forms[ID]
+				temp.DataGetCourier.Address = temp.DataGetCourier.Address + Text
+				Forms[ID] = temp
 				i++ //3
+				WriteUDIndex(ID)
+				msg.Text = "Укажите имя контактного лица"
 			case 3:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
-				msg.ReplyMarkup = btnContact
+				//записываем полученное имя в поле Person
+				temp := Forms[ID]
+				temp.DataGetCourier.Person = temp.DataGetCourier.Person + Text
+				Forms[ID] = temp
 				i++ //4
+				WriteUDIndex(ID)
+				msg.ReplyMarkup = btnContact
+				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
+
 			case 4:
-				msg.ReplyMarkup = kbrdMain
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
-					"\n1) Забрать картриджи, заправить, вернуть." +
-					"\n2) Купить 1 новый картридж ce285a и выставить счет." +
-					"\n3) После заправки привезти акт сверки и новый счет." +
-					"\n4) Забрать подписанный договор." +
-					"\n...или ваш вариант"
+				//записываем полученный телефон в поле Phone
+				temp := Forms[ID]
+				temp.DataGetCourier.Phone = temp.DataGetCourier.Phone + Text
+				Forms[ID] = temp
 				i++ //5
+				WriteUDIndex(ID)
+				msg.ReplyMarkup = kbrdMain
+				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
+					"\n- забрать картриджи, заправить, вернуть." +
+					"\n- купить 1 новый картридж ce285a и выставить счет." +
+					"\n- после заправки привезти акт сверки и новый счет." +
+					"\n- забрать подписанный договор." +
+					"\n...или ваш вариант"
 			case 5:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = "Укажите удобную дату и время приезда курьера"
+				//записываем полученную цель вызова в поле Purpose
+				temp := Forms[ID]
+				temp.DataGetCourier.Purpose = temp.DataGetCourier.Purpose + Text
+				Forms[ID] = temp
 				i++ //6
+				WriteUDIndex(ID)
+				msg.ReplyMarkup = kbrdMain
+				msg.Text = "Укажите удобную дату и время приезда курьера"
 			case 6:
-				ClientForm[i] = ClientForm[i] + msg.Text
-				msg.Text = strings.Join(ClientForm, "\n") + "\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
-				msg.ReplyMarkup = kbrdYN
+				//записываем полученную дату и время в поле Time
+				temp := Forms[ID]
+				temp.DataGetCourier.Time = temp.DataGetCourier.Time + Text
+				Forms[ID] = temp
 				i++ //7
+				WriteUDIndex(ID)
+				msg.ReplyMarkup = kbrdYN
+				//Выводим записанные данные клиента в виде сообщения
+				//TODO: заменить temp.DataGetCourier.Time на вывод всех данных структуры DataGetCourier, сейчас выводит только время
+				msg.Text = temp.DataGetCourier.Time + "\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
 			case 7:
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки.\n "
 				i = 0
-				ClientForm = perm.Form
+				WriteUDIndex(ID)
 			}
 			if _, err = bot.Send(msg); err != nil {
 				panic(err)
@@ -205,26 +245,28 @@ func main() {
 			switch update.CallbackQuery.Data {
 			case perm.Organization:
 				msg.Text = perm.NameOfTheOrganization
-				ID := update.CallbackQuery.Message.Chat.ID
 				i = 1
-				func WriteUD(ID, i)
+				ID := update.CallbackQuery.Message.Chat.ID
+				WriteUDIndex(ID)
 			case perm.NotOrganization:
 				msg.Text = perm.Adress
-				ID := update.CallbackQuery.Message.Chat.ID
 				i = 2
-				func WriteUD(ID, i)
+				ID := update.CallbackQuery.Message.Chat.ID
+				WriteUDIndex(ID)
 			case perm.Yes:
-				ClientForm = perm.Form
+				//ClientForm = perm.Form - обнуление, которое не работает
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
-				ID := update.CallbackQuery.Message.Chat.ID
 				i = 0
-				func WriteUD(ID, i)
+				ID := update.CallbackQuery.Message.Chat.ID
+				WriteUDIndex(ID)
 			case perm.No:
-				ClientForm = perm.Form
+				//ClientForm = perm.Form - обнуление, которое не работает
 				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
 				i = 0
+				ID := update.CallbackQuery.Message.Chat.ID
+				WriteUDIndex(ID)
 			}
 
 			if _, err := bot.Send(msg); err != nil {
@@ -232,244 +274,6 @@ func main() {
 
 			}
 		}
-		if i == 0 {
-			ClientForm = perm.Form
-		}
+
 	}
 }
-
-/*
-	for update := range updates {
-		if update.Message == nil { // игнорируем отсутствие сообщения в обновлении
-			continue
-		}
-
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-
-		//Отображение главного меню после ввода команды /start
-		switch update.Message.Text {
-		case "/start":
-			msg.Text = "Ты учреждение?"
-			msg.ReplyMarkup = kbrdYNOrg
-		case "/close":
-			msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-		default:
-			msg.Text = "Я тебя не понимаю"
-		}
-
-		if update.CallbackQuery != nil {
-			msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Data)
-			buttonData := update.CallbackQuery.Data
-
-			switch buttonData {
-			case perm.Organization:
-				msg.Text = perm.NameOfTheOrganization
-			case perm.NotOrganization:
-				msg.Text = perm.Adress
-				//msg.ChatID = chatID
-			}
-		}
-		// Отправляем сообщение
-		if _, err = bot.Send(msg); err != nil {
-			panic(err)
-		}
-	}
-}
-
-/*
-   		if update.CallbackQuery != nil {
-   			buttonData := update.CallbackQuery.Data
-   			//chatID := update.CallbackQuery.Message.Chat.ID
-
-   			switch buttonData {
-   			case perm.Organization:
-   				msg.Text = perm.NameOfTheOrganization
-
-   				//msg.ChatID = chatID
-   				if _, err := bot.Send(msg); err != nil {
-   					log.Panic(err)
-   				}
-
-   			case perm.NotOrganization:
-   				msg.Text = perm.Adress
-   				//msg.ChatID = chatID
-   			}
-   		}
-
-   		if _, err := bot.Send(msg); err != nil {
-   			log.Panic(err)
-   		}
-   	}
-   }
-
-   /*
-   for update := range updates {
-   		if update.Message == nil { // ignore non-Message updates
-   			continue
-   		}
-
-   		msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-
-   		//Отображение главного меню после ввода команды /start
-   		switch update.Message.Text {
-   		case "/start":
-   			msg.Text = "Воспользуйтесь моей встроенной клавиатурой"
-   			msg.ReplyMarkup = kbrdMain
-   		case "/close":
-   			msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-   		}
-
-   		//Статус заказа, написать менеджеру, звонок в офис
-   		switch update.Message.Text {
-   		case perm.OrderStatus:
-   			msg.Text = perm.InDev
-   		case perm.WriteToManager:
-   			msg.Text = "Нажмите эту кнопку для перехода в чат с менеджером"
-   			msg.ReplyMarkup = btnURL
-   			//msg.Text = ""
-   		case perm.CallTheOffice:
-   			msg.Text = perm.CallThisNumber
-   		case perm.RecordInService:
-   			msg.Text = perm.InDev
-   		}
-
-   		//Обработка нажатия inlinе-кнопок
-   		if update.CallbackQuery != nil {
-   			buttonData := update.CallbackQuery.Data
-   			chatID := update.CallbackQuery.Message.Chat.ID
-
-   			switch buttonData {
-   			case perm.Organization:
-   				msg.Text = perm.NameOfTheOrganization
-   				msg.ChatID = chatID
-   				//if _, err := bot.Send(msg); err != nil {
-   				//	log.Panic(err)
-   				//}
-
-   			case perm.NotOrganization:
-   				msg.Text = perm.Adress
-   				msg.ChatID = chatID
-   			}
-   		}
-
-   		//Вызвать курьера
-   		switch update.Message.Text {
-   		case perm.GetCourier:
-   			msg.Text = "Вы представляете учреждение?"
-   			msg.ReplyMarkup = kbrdYNOrg
-
-   		case perm.NotOrganization:
-   			msg.Text = "Укажите полный адрес, где забрать"
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал адрес")),
-   			)
-   		case perm.Organization:
-   			msg.Text = perm.NameOfTheOrganization
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал учреждение")),
-   			)
-   		case "Указал учреждение":
-   			msg.Text = "Укажите полный адрес, где забрать"
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал адрес")),
-   			)
-   		case "Указал адрес":
-   			msg.Text = "Укажите имя контактного лица"
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал имя контактного лица")),
-   			)
-   		case "Указал имя контактного лица":
-   			msg.Text = "Нажмите кнопку, чтобы указать свой номер телефона или введите другой номер телефона"
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал номер телефона")),
-   			)
-   		case "Указал номер телефона":
-   			msg.Text = "Для чего вызываете курьера? Например, ..."
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал цель вызова курьера")),
-   			)
-   		case "Указал цель вызова курьера":
-   			msg.Text = "Укажите удобное время приезда курьера"
-   			msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   				tgbotapi.NewKeyboardButtonRow(
-   					tgbotapi.NewKeyboardButton("Указал время")),
-   			)
-   		case "Указал время":
-   			msg.Text = "Спасибо, информация записана. Для подтверждения с вами свяжется менеджер в ближайшее время."
-   			msg.ReplyMarkup = kbrdMain
-
-   		case perm.Back:
-   			msg.ReplyMarkup = kbrdMain
-
-   		}
-
-   		/*
-   			//Вызвать курьера
-   			switch update.Message.Text {
-   			case perm.GetCourier:
-   				msg.Text = "Вы представляете учреждение?"
-   				msg.ReplyMarkup = kbrdYNOrg
-
-   			case perm.NotOrganization:
-   				msg.Text = "Укажите полный адрес, где забрать"
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал адрес")),
-   				)
-   			case perm.Organization:
-   				msg.Text = perm.NameOfTheOrganization
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал учреждение")),
-   				)
-   			case "Указал учреждение":
-   				msg.Text = "Укажите полный адрес, где забрать"
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал адрес")),
-   				)
-   			case "Указал адрес":
-   				msg.Text = "Укажите имя контактного лица"
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал имя контактного лица")),
-   				)
-   			case "Указал имя контактного лица":
-   				msg.Text = "Нажмите кнопку, чтобы указать свой номер телефона или введите другой номер телефона"
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал номер телефона")),
-   				)
-   			case "Указал номер телефона":
-   				msg.Text = "Для чего вызываете курьера? Например, ..."
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал цель вызова курьера")),
-   				)
-   			case "Указал цель вызова курьера":
-   				msg.Text = "Укажите удобное время приезда курьера"
-   				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-   					tgbotapi.NewKeyboardButtonRow(
-   						tgbotapi.NewKeyboardButton("Указал время")),
-   				)
-   			case "Указал время":
-   				msg.Text = "Спасибо, информация записана. Для подтверждения с вами свяжется менеджер в ближайшее время."
-   				msg.ReplyMarkup = kbrdMain
-
-   			case perm.Back:
-   				msg.ReplyMarkup = kbrdMain
-
-   			}
-
-   if _, err := bot.Send(msg); err != nil {
-   log.Panic(err)
-   }
-
-   }
-*/
