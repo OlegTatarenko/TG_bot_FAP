@@ -2,6 +2,7 @@ package main
 
 import (
 	"TG_bot_FAP/perm"
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 )
@@ -41,7 +42,7 @@ var (
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
 var i = 0
 
-// Forms хеш-таблица для хранения данных пользователей
+// Forms мапа для хранения данных пользователей
 var Forms = make(map[int64]UserData)
 
 // UserData структура для записи данных пользователя при вызове курьера или при записи на сервис
@@ -66,7 +67,7 @@ type Blank struct {
 var UD = UserData{
 	0,
 	B,
-	"",
+	"DataRecInService",
 	0,
 }
 
@@ -80,7 +81,7 @@ var B = Blank{
 	"Дата, время приезда курьера: ",
 }
 
-// WriteUDStart функция для создания записи ползователя в мапе с ID ползователя
+// WriteUDStart функция для создания записи пользователя в мапе с ID пользователя
 func WriteUDStart(ID int64) {
 	if _, ok := Forms[ID]; !ok {
 		//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
@@ -91,7 +92,7 @@ func WriteUDStart(ID int64) {
 
 // WriteUDIndex функция для изменения индекса в данных пользователя
 func WriteUDIndex(ID int64) {
-	//переменная с копией структуры, чтобы обратиться к полю структуры внутри мапы, т.к. обращение через Forms[ID].index = i языком не предусмотрено
+	//переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы, т.к. изменение значения поля через Forms[ID].index = i языком не предусмотрено
 	//изменяем счетчик и записываем его в index
 	temp := Forms[ID]
 	temp.Index = i
@@ -113,29 +114,21 @@ func main() {
 
 	updates := bot.GetUpdatesChan(updateConfig)
 
-	// Срез для записи информации клиента при вызове курьера
-	//ClientForm := perm.Form
-
 	// Loop through each update.
 	for update := range updates {
 
-		// Создаем запись о пользователе в мапе, если записи не существует
-		ID := update.Message.Chat.ID
-		Text := update.Message.Text
-		WriteUDStart(ID)
-		//переменная с копией структуры, чтобы получить значение поля структуры из мапы, т.к. обращение через Forms[ID].index > 0 языком не предусмотрено
-		ind := Forms[ID].Index
-
-		// Опрос клиента после нажатия кнопки Вызвать курьера, т.е. при условии, что i > 0
-		if ind > 0 && update.Message != nil {
+		// Опрос клиента после нажатия кнопки Вызвать курьера, т.е. при условии, что UserData.Index > 0
+		if update.Message != nil && Forms[update.Message.From.ID].Index > 0 {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-			switch ind {
+			ID := update.Message.Chat.ID
+			Text := update.Message.Text
+			switch Forms[update.Message.From.ID].Index {
 			case 1:
 				//записываем полученное наименование организации в поле Org
 				temp := Forms[ID]
 				temp.DataGetCourier.Org = temp.DataGetCourier.Org + Text
 				Forms[ID] = temp
-				i++ //2
+				i = 2
 				WriteUDIndex(ID)
 				msg.Text = perm.Adress
 			case 2:
@@ -143,7 +136,7 @@ func main() {
 				temp := Forms[ID]
 				temp.DataGetCourier.Address = temp.DataGetCourier.Address + Text
 				Forms[ID] = temp
-				i++ //3
+				i = 3
 				WriteUDIndex(ID)
 				msg.Text = "Укажите имя контактного лица"
 			case 3:
@@ -151,7 +144,7 @@ func main() {
 				temp := Forms[ID]
 				temp.DataGetCourier.Person = temp.DataGetCourier.Person + Text
 				Forms[ID] = temp
-				i++ //4
+				i = 4
 				WriteUDIndex(ID)
 				msg.ReplyMarkup = btnContact
 				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
@@ -161,7 +154,7 @@ func main() {
 				temp := Forms[ID]
 				temp.DataGetCourier.Phone = temp.DataGetCourier.Phone + Text
 				Forms[ID] = temp
-				i++ //5
+				i = 5
 				WriteUDIndex(ID)
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
@@ -175,7 +168,7 @@ func main() {
 				temp := Forms[ID]
 				temp.DataGetCourier.Purpose = temp.DataGetCourier.Purpose + Text
 				Forms[ID] = temp
-				i++ //6
+				i = 6
 				WriteUDIndex(ID)
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Укажите удобную дату и время приезда курьера"
@@ -184,17 +177,37 @@ func main() {
 				temp := Forms[ID]
 				temp.DataGetCourier.Time = temp.DataGetCourier.Time + Text
 				Forms[ID] = temp
-				i++ //7
+				i = 7
 				WriteUDIndex(ID)
 				msg.ReplyMarkup = kbrdYN
 				//Выводим записанные данные клиента в виде сообщения
-				//TODO: заменить temp.DataGetCourier.Time на вывод всех данных структуры DataGetCourier, сейчас выводит только время
-				msg.Text = temp.DataGetCourier.Time + "\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
+				msg.Text = Forms[ID].DataGetCourier.Intro +
+					"\n" + Forms[ID].DataGetCourier.Address +
+					"\n" + Forms[ID].DataGetCourier.Person +
+					"\n" + Forms[ID].DataGetCourier.Phone +
+					"\n" + Forms[ID].DataGetCourier.Purpose +
+					"\n" + Forms[ID].DataGetCourier.Time +
+					"\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
 			case 7:
+				//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
+				msg.ChatID = perm.ManagerID
+				msg.Text = "⚡ Заявка на вызов курьера:" +
+					"\n\n" + Forms[ID].DataGetCourier.Address +
+					"\n" + Forms[ID].DataGetCourier.Person +
+					"\n" + Forms[ID].DataGetCourier.Phone +
+					"\n" + Forms[ID].DataGetCourier.Purpose +
+					"\n" + Forms[ID].DataGetCourier.Time +
+					"\n\n" + "Позвоните по указанному телефону для подтверждения заявки"
+				if _, err := bot.Send(msg); err != nil {
+					panic(err)
+
+				}
+				//удаляем из мапы запись с данными пользователя
+				delete(Forms, ID)
+				//отправляем сообщение пользователю
+				msg.ChatID = ID
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки.\n "
-				i = 0
-				WriteUDIndex(ID)
 			}
 			if _, err = bot.Send(msg); err != nil {
 				panic(err)
@@ -241,32 +254,71 @@ func main() {
 			}
 			// And finally, send a message containing the data received.
 			msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Data)
+			ID := update.CallbackQuery.Message.Chat.ID
 
 			switch update.CallbackQuery.Data {
 			case perm.Organization:
 				msg.Text = perm.NameOfTheOrganization
 				i = 1
-				ID := update.CallbackQuery.Message.Chat.ID
-				WriteUDIndex(ID)
+				if _, ok := Forms[ID]; !ok {
+					//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
+					UD.UserID = ID
+					Forms[ID] = UD
+					// и меняем индекс у пользователя
+					temp := Forms[ID]
+					temp.Index = i
+					Forms[ID] = temp
+				} else {
+					// меняем индекс у пользователя
+					temp := Forms[ID]
+					temp.Index = i
+					Forms[ID] = temp
+				}
 			case perm.NotOrganization:
 				msg.Text = perm.Adress
 				i = 2
-				ID := update.CallbackQuery.Message.Chat.ID
-				WriteUDIndex(ID)
+				if _, ok := Forms[ID]; !ok {
+					//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
+					UD.UserID = ID
+					Forms[ID] = UD
+					// и меняем индекс у пользователя
+					temp := Forms[ID]
+					temp.Index = i
+					Forms[ID] = temp
+				} else {
+					// меняем индекс у пользователя
+					temp := Forms[ID]
+					temp.Index = i
+					Forms[ID] = temp
+				}
 			case perm.Yes:
-				//ClientForm = perm.Form - обнуление, которое не работает
+				//после подтверждения пользователем ввода корректных данных отправляем сообщение менеджеру с этими данными
+				msg.ChatID = perm.ManagerID
+				msg.Text = "⚡ Заявка на вызов курьера:" +
+					"\n\n" + Forms[ID].DataGetCourier.Address +
+					"\n" + Forms[ID].DataGetCourier.Person +
+					"\n" + Forms[ID].DataGetCourier.Phone +
+					"\n" + Forms[ID].DataGetCourier.Purpose +
+					"\n" + Forms[ID].DataGetCourier.Time +
+					"\n\n" + "Позвоните по указанному телефону для подтверждения заявки"
+				if _, err := bot.Send(msg); err != nil {
+					panic(err)
+
+				}
+				//пользователю выводим главное меню и шлем сообщение
 				msg.ReplyMarkup = kbrdMain
+				msg.ChatID = ID
 				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
-				i = 0
-				ID := update.CallbackQuery.Message.Chat.ID
-				WriteUDIndex(ID)
+				//i = 0
+				//удаляем из мапы запись с данными пользователя
+				delete(Forms, ID)
 			case perm.No:
-				//ClientForm = perm.Form - обнуление, которое не работает
+				//Стираем данные из полей пользователя, перезаписывая их на пустые поля
+				Forms[ID] = UD
 				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
-				i = 0
-				ID := update.CallbackQuery.Message.Chat.ID
-				WriteUDIndex(ID)
+				//i = 0
+
 			}
 
 			if _, err := bot.Send(msg); err != nil {
@@ -275,5 +327,10 @@ func main() {
 			}
 		}
 
+		fmt.Println("\v", Forms)
+
+		//for key, value := range Forms {
+		//	fmt.Printf("\n%v = %v\n", key, value)
+		//}
 	}
 }
