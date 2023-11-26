@@ -47,7 +47,8 @@ var Forms = make(map[int64]UserData)
 
 // UserData структура для записи данных пользователя при вызове курьера или при записи на сервис
 type UserData struct {
-	UserID           int64
+	FirstName        string
+	Username         string
 	DataGetCourier   Blank
 	DataRecInService string
 	Index            int
@@ -64,10 +65,12 @@ type Blank struct {
 	Time    string
 }
 
+// TODO: Добавить поле для ссылки на чат
 var UD = UserData{
-	0,
+	"Имя: ",
+	"Username: ",
 	B,
-	"DataRecInService",
+	"Вызов курьера",
 	0,
 }
 
@@ -82,18 +85,28 @@ var B = Blank{
 }
 
 // WriteUDStart функция для создания записи пользователя в мапе с ID пользователя
-func WriteUDStart(ID int64) {
+func WriteUDStart(ID int64, FirstName, Username string) {
 	if _, ok := Forms[ID]; !ok {
-		//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
-		UD.UserID = ID
-		Forms[ID] = UD
+		Forms[ID] = UD    //Если нет ключа, равного ID, то создаем элемент мапы с ключом = ID
+		temp := Forms[ID] //переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы,
+		//т.к. изменение значения поля через Forms[ID].index = i языком не предусмотрено
+		temp.FirstName = FirstName //Записываем в поле имя пользователя
+		temp.Username = Username   //Записываем в поле Username пользователя
+		temp.Index = i             // Меняем индекс у пользователя
+		Forms[ID] = temp           //Изменяем запись в мапе
+	} else {
+		// меняем индекс у пользователя
+		temp := Forms[ID]
+		temp.Index = i
+		Forms[ID] = temp
 	}
 }
 
 // WriteUDIndex функция для изменения индекса в данных пользователя
 func WriteUDIndex(ID int64) {
-	//переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы, т.к. изменение значения поля через Forms[ID].index = i языком не предусмотрено
-	//изменяем счетчик и записываем его в index
+	//переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы,
+	//т.к. изменение значения поля через Forms[ID].index = i языком не предусмотрено
+	//счетчик записываем в index
 	temp := Forms[ID]
 	temp.Index = i
 	Forms[ID] = temp
@@ -152,7 +165,14 @@ func main() {
 			case 4:
 				//записываем полученный телефон в поле Phone
 				temp := Forms[ID]
-				temp.DataGetCourier.Phone = temp.DataGetCourier.Phone + Text
+				if update.Message.Text != "" {
+					//если пользователь отправил телефон текстовым сообщением, то записываем его в поле
+					temp.DataGetCourier.Phone = temp.DataGetCourier.Phone + Text
+				} else {
+					//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
+					temp.DataGetCourier.Phone = temp.DataGetCourier.Phone + update.Message.Contact.PhoneNumber
+				}
+
 				Forms[ID] = temp
 				i = 5
 				WriteUDIndex(ID)
@@ -182,6 +202,7 @@ func main() {
 				msg.ReplyMarkup = kbrdYN
 				//Выводим записанные данные клиента в виде сообщения
 				msg.Text = Forms[ID].DataGetCourier.Intro +
+					"\n" + Forms[ID].DataGetCourier.Org +
 					"\n" + Forms[ID].DataGetCourier.Address +
 					"\n" + Forms[ID].DataGetCourier.Person +
 					"\n" + Forms[ID].DataGetCourier.Phone +
@@ -192,12 +213,15 @@ func main() {
 				//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
 				msg.ChatID = perm.ManagerID
 				msg.Text = "⚡ Заявка на вызов курьера:" +
-					"\n\n" + Forms[ID].DataGetCourier.Address +
+					"\n\n" + Forms[ID].FirstName +
+					"\n" + Forms[ID].Username +
+					"\n" + Forms[ID].DataGetCourier.Org +
+					"\n" + Forms[ID].DataGetCourier.Address +
 					"\n" + Forms[ID].DataGetCourier.Person +
 					"\n" + Forms[ID].DataGetCourier.Phone +
 					"\n" + Forms[ID].DataGetCourier.Purpose +
 					"\n" + Forms[ID].DataGetCourier.Time +
-					"\n\n" + "Позвоните по указанному телефону для подтверждения заявки"
+					"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
 				if _, err := bot.Send(msg); err != nil {
 					panic(err)
 
@@ -260,65 +284,56 @@ func main() {
 			case perm.Organization:
 				msg.Text = perm.NameOfTheOrganization
 				i = 1
-				if _, ok := Forms[ID]; !ok {
-					//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
-					UD.UserID = ID
-					Forms[ID] = UD
-					// и меняем индекс у пользователя
-					temp := Forms[ID]
-					temp.Index = i
-					Forms[ID] = temp
-				} else {
-					// меняем индекс у пользователя
-					temp := Forms[ID]
-					temp.Index = i
-					Forms[ID] = temp
-				}
+				FirstName := UD.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := UD.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				WriteUDStart(ID, FirstName, Username)
 			case perm.NotOrganization:
 				msg.Text = perm.Adress
 				i = 2
-				if _, ok := Forms[ID]; !ok {
-					//если нет ключа, равного ID, то создаем элемент мапы, записав в соотв. поле ID
-					UD.UserID = ID
-					Forms[ID] = UD
-					// и меняем индекс у пользователя
-					temp := Forms[ID]
-					temp.Index = i
-					Forms[ID] = temp
-				} else {
-					// меняем индекс у пользователя
-					temp := Forms[ID]
-					temp.Index = i
-					Forms[ID] = temp
-				}
+				FirstName := UD.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := UD.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				WriteUDStart(ID, FirstName, Username)
 			case perm.Yes:
-				//после подтверждения пользователем ввода корректных данных отправляем сообщение менеджеру с этими данными
-				msg.ChatID = perm.ManagerID
-				msg.Text = "⚡ Заявка на вызов курьера:" +
-					"\n\n" + Forms[ID].DataGetCourier.Address +
-					"\n" + Forms[ID].DataGetCourier.Person +
-					"\n" + Forms[ID].DataGetCourier.Phone +
-					"\n" + Forms[ID].DataGetCourier.Purpose +
-					"\n" + Forms[ID].DataGetCourier.Time +
-					"\n\n" + "Позвоните по указанному телефону для подтверждения заявки"
-				if _, err := bot.Send(msg); err != nil {
-					panic(err)
-
+				// Проверяем, что запись в мапе существует
+				if _, ok := Forms[ID]; ok {
+					temp := Forms[ID]
+					//Проверяем, что индекс = 7, т.е. пользователь ответил на все вопросы
+					if temp.Index == 7 {
+						// Отправляем сообщение менеджеру с данными
+						msg.ChatID = perm.ManagerID
+						msg.Text = "⚡ Заявка на вызов курьера:" +
+							"\n\n" + Forms[ID].FirstName +
+							"\n" + Forms[ID].Username +
+							"\n" + Forms[ID].DataGetCourier.Org +
+							"\n" + Forms[ID].DataGetCourier.Address +
+							"\n" + Forms[ID].DataGetCourier.Person +
+							"\n" + Forms[ID].DataGetCourier.Phone +
+							"\n" + Forms[ID].DataGetCourier.Purpose +
+							"\n" + Forms[ID].DataGetCourier.Time +
+							"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
+						if _, err := bot.Send(msg); err != nil {
+							panic(err)
+						}
+						//пользователю выводим главное меню и шлем сообщение
+						msg.ReplyMarkup = kbrdMain
+						msg.ChatID = ID
+						msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
+						//удаляем из мапы запись с данными пользователя
+						delete(Forms, ID)
+					} else { //При повторном нажатии на кнопку "Да, все верно" и ответах не на все вопросы отработает эта ветка
+						msg.Text = "Вы ответили не на все вопросы. Пожалуйста, нажмите кнопку \"Вызвать курьера\" снизу в меню."
+					}
+				} else { //При повторном нажатии на кнопку "Да, все верно" без предварительного ответа на вопросы для вызова курьера отработает эта ветка
+					msg.Text = "Ваша заявка на вызов курьера уже была принята. Для оформления новой заявки нажмите кнопку \"Вызвать курьера\" снизу в меню."
 				}
-				//пользователю выводим главное меню и шлем сообщение
-				msg.ReplyMarkup = kbrdMain
-				msg.ChatID = ID
-				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
-				//i = 0
-				//удаляем из мапы запись с данными пользователя
-				delete(Forms, ID)
 			case perm.No:
 				//Стираем данные из полей пользователя, перезаписывая их на пустые поля
-				Forms[ID] = UD
+				i = 0
+				FirstName := UD.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := UD.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				WriteUDStart(ID, FirstName, Username)
 				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
-				//i = 0
-
 			}
 
 			if _, err := bot.Send(msg); err != nil {
@@ -328,9 +343,6 @@ func main() {
 		}
 
 		fmt.Println("\v", Forms)
-
-		//for key, value := range Forms {
-		//	fmt.Printf("\n%v = %v\n", key, value)
-		//}
+		fmt.Println("\v", UD)
 	}
 }
