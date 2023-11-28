@@ -126,23 +126,35 @@ func writeUDIndex(ID int64) {
 	forms[ID] = temp
 }
 
-//TODO:Добавить проверку по времени. Если запись в сервис осуществляется позже 16:30 в будний, или позже 14:00 в субботу, то пропустить сегодняшний день
-// добавить "или" для времени в условие с вскр
+//TODO: Тест - запись в субботу в между 14:00 и 14:30
 
 // getKeyboardDate формирует клавиатуру из 6 инлайн кнопок, для чего создает слайс длиной 6 из строк,
 // где каждая строка - дата для инлайн кнопки на запись в сервис
 func getKeyboardDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	sliceDate := make([]string, 6, 6)
-	j := 0 // индекс сдвига даты, если день недели воскресенье
+	j := 0                   // индексы сдвига даты
+	hh, mm, _ := t.Clock()   //берем часы и минуты из времени нажатия на кнопку
+	cntrlTimeSatHH := 14     // контрольное время для субботы 14:00 - для сравнения значения часов
+	cntrlTimeSatMM := 0      // контрольное время для субботы 14:00 - для сравнения значения минут
+	cntrlTimeWorkdayHH := 16 //контрольное время для будних дней 16:30 - для сравнения значения часов
+	cntrlTimeWorkdayMM := 30 //контрольное время для будних дней 16:30 - для сравнения значения минут
 	for k := 0; k < len(sliceDate); k++ {
-		dateRecInService := t.Add(time.Hour * 24 * time.Duration(k+j)) //формируем в цикле 6 дат, добавляя к текущей дате 24*(k+j) часов
-		weekDay := dateRecInService.Weekday()                          //определяем для каждой даты день недели
-		//если день недели - воскресенье, т.е. выходной, то увеличиваем j на единицу, чтобы не выводить на кнопке дату воскресенья
+		l := 0 // индексы сдвига даты
+		//если время нажатия на кнопку > 16:30 (cntrlTimeWorkday) или день нажатия на кнопку - суббота и время > 14:00 (cntrlTimeSat), то
+		//увеличиваем l на единицу, чтобы пропустить сегодняшнюю дату
+		if hh > cntrlTimeWorkdayHH || (hh == cntrlTimeWorkdayHH && mm > cntrlTimeWorkdayMM) || (t.Weekday() == time.Saturday && (hh > cntrlTimeSatHH || hh == cntrlTimeSatHH && mm > cntrlTimeSatMM)) {
+			l = 1
+		}
+
+		datesRecInService := t.Add(time.Hour * 24 * time.Duration(k+j+l)) //добавляем к текущей дате 24*(k+j+l) часов
+		weekDay := datesRecInService.Weekday()                            //определяем для даты день недели
+
+		//если день недели - воскресенье, т.е. выходной, то j=1 , чтобы пропустить дату воскресенья
 		if weekDay == time.Sunday {
 			j = 1
-			dateRecInService = t.Add(time.Hour * 24 * time.Duration(k+j))
+			datesRecInService = t.Add(time.Hour * 24 * time.Duration(k+j+l))
 		}
-		sliceDate[k] = dateRecInService.Format("02.01.2006") //форматируем дату в строку и записываем в слайс
+		sliceDate[k] = datesRecInService.Format("02.01.2006") //форматируем дату в строку и записываем в слайс
 	}
 	kbrdDates = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
