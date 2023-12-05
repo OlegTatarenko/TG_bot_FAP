@@ -45,10 +45,12 @@ var (
 		))
 	kbrdBeforeAfterLunch = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("До обеда", "beforeLunch"),
-			tgbotapi.NewInlineKeyboardButtonData("После обеда", "afterLunch"),
+			tgbotapi.NewInlineKeyboardButtonData("До обеда (9:00-13:00)", "beforeLunch"),
+			tgbotapi.NewInlineKeyboardButtonData("После обеда (13:00 - 18:00)", "afterLunch"),
 		))
 )
+
+//TODO требует рестарта после перехода в чат менеджеру и возврата к боту - исправить
 
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
 var i = 0
@@ -101,7 +103,7 @@ var dataGetCourier = blankGetCourier{
 }
 var dataRecInService = blankRecInService{
 	"Спасибо! Вы ввели следующие данные: ",
-	"Дата ",
+	"Дата: ",
 	"Время: ",
 	"Устройство: ",
 	"Проблема: ",
@@ -382,12 +384,12 @@ func main() {
 				msg.Text = "⚡ Запись на сервис:" +
 					"\n\n" + users[ID].FirstName +
 					"\n" + users[ID].Username +
-					//"\n" + users[ID].GetCourier.Org +
-					//"\n" + users[ID].GetCourier.Address +
-					//"\n" + users[ID].GetCourier.Person +
-					//"\n" + users[ID].GetCourier.Phone +
-					//"\n" + users[ID].GetCourier.Purpose +
-					//"\n" + users[ID].GetCourier.Time +
+					"\n" + users[ID].RecInService.Date +
+					"\n" + users[ID].RecInService.Time +
+					"\n" + users[ID].RecInService.Device +
+					"\n" + users[ID].RecInService.Problem +
+					"\n" + users[ID].RecInService.Phone +
+					"\n" + users[ID].RecInService.Name +
 					"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
 				if _, err := bot.Send(msg); err != nil {
 					panic(err)
@@ -454,6 +456,7 @@ func main() {
 				if update.CallbackQuery.Data == val {
 					res = val
 				}
+			}
 
 			switch update.CallbackQuery.Data {
 			case perm.Organization:
@@ -517,18 +520,26 @@ func main() {
 				writeUDStart(ID, FirstName, Username)
 				//записываем дату в поле Date
 				temp := users[ID]
-				temp.RecInService.Date = temp.RecInService.Date + update.CallbackQuery.Message.Text
+				temp.RecInService.Date = temp.RecInService.Date + update.CallbackQuery.Data
 				users[ID] = temp
 				msg.Text = "Выберете удобное время:"   // TODO прописать сообщение в константы
 				msg.ReplyMarkup = kbrdBeforeAfterLunch //рисуем кнопки "до/после обеда"
 			case "beforeLunch":
 				// TODO записать время в структуру
 				i = 8
+				//записываем время в поле Time
+				temp := users[ID]
+				temp.RecInService.Time = temp.RecInService.Time + "До обеда"
+				users[ID] = temp
 				writeUDIndex(ID)
 				msg.Text = "Какая у вас проблема? (например, разбился экран телефона)" // TODO прописать сообщение в константы
 			case "afterLunch":
 				// TODO записать время в структуру
 				i = 8
+				//записываем время в поле Time
+				temp := users[ID]
+				temp.RecInService.Time = temp.RecInService.Time + "После обеда"
+				users[ID] = temp
 				writeUDIndex(ID)
 				msg.Text = "Какая у вас проблема? Например, разбился экран телефона." // TODO прописать сообщение в константы
 			case "yes":
@@ -542,12 +553,12 @@ func main() {
 						msg.Text = "⚡ Запись в Сервис:" +
 							"\n\n" + users[ID].FirstName +
 							"\n" + users[ID].Username +
-							//"\n" + users[ID].GetCourier.Org +
-							//"\n" + users[ID].GetCourier.Address +
-							//"\n" + users[ID].GetCourier.Person +
-							//"\n" + users[ID].GetCourier.Phone +
-							//"\n" + users[ID].GetCourier.Purpose +
-							//"\n" + users[ID].GetCourier.Time +
+							"\n" + users[ID].RecInService.Date +
+							"\n" + users[ID].RecInService.Time +
+							"\n" + users[ID].RecInService.Device +
+							"\n" + users[ID].RecInService.Problem +
+							"\n" + users[ID].RecInService.Phone +
+							"\n" + users[ID].RecInService.Name +
 							"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
 						if _, err := bot.Send(msg); err != nil {
 							panic(err)
