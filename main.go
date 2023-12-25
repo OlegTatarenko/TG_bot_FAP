@@ -2,6 +2,7 @@ package main
 
 import (
 	"TG_bot_FAP/perm"
+	"TG_bot_FAP/remonline"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
@@ -96,8 +97,8 @@ var dataGetCourier = blankGetCourier{
 	"Спасибо! Вы ввели следующие данные: ",
 	"Учреждение (если применимо): ",
 	"Адрес, где забрать: ",
-	"Контактное лицо: ",
-	"Контактный телефон: ",
+	"Имя: ",
+	"Номер телефона: ",
 	"Цель вызова курьера: ",
 	"Дата, время приезда курьера: ",
 }
@@ -113,7 +114,7 @@ var dataRecInService = blankRecInService{
 
 // TODO: Добавить поле для ссылки на чат
 var ud = user{
-	"Имя: ",
+	"Name: ",
 	"Username: ",
 	dataGetCourier,
 	dataRecInService,
@@ -194,18 +195,6 @@ func getKeyboardDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	return kbrdDates
 }
 
-//////getDay возвращает значение data после нажатия кнопки клавиатуры kbrdDates
-//func getDay([]string, update.CallbackQuery.Data) string {
-//	res := ""
-//u := update.CallbackQuery.Data
-//	for _, val := range btnsKbrdDates {
-//		if update.CallbackQuery.Data = val {
-//			res = val
-//		}
-//	}
-//	return res
-//}
-
 func main() {
 	bot, err := tgbotapi.NewBotAPI(perm.Token)
 	if err != nil {
@@ -226,7 +215,7 @@ func main() {
 
 		//TODO: Добавить условие, чтобы не принимал нажатие кнопок главного меню в качестве ответов в этой ветке или убирать кнопки главного меню
 
-		// Опрос клиента после нажатия кнопки Вызвать курьера, т.е. при условии, что user.Index > 0
+		// Опрос клиента после нажатия кнопок Вызвать курьера, Запись в сервис или Статус заказа, т.е. при условии, что user.Index > 0
 		if update.Message != nil && users[update.Message.From.ID].Index > 0 {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			ID := update.Message.Chat.ID
@@ -239,7 +228,7 @@ func main() {
 				users[ID] = temp
 				i = 2
 				writeUDIndex(ID)
-				msg.Text = perm.Adress
+				msg.Text = perm.Address
 			case 2:
 				//записываем полученный адрес в поле Address
 				temp := users[ID]
@@ -256,8 +245,7 @@ func main() {
 				i = 4
 				writeUDIndex(ID)
 				msg.ReplyMarkup = btnContact
-				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
-
+				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить свой номер телефона, к которому привязан ваш аккаунт телеграма"
 			case 4:
 				//записываем полученный телефон в поле Phone
 				temp := users[ID]
@@ -401,6 +389,23 @@ func main() {
 				msg.ChatID = ID
 				msg.ReplyMarkup = kbrdMain
 				msg.Text = "Спасибо, вы записаны на сервис\n "
+			case 13: //ветка после нажатия на кнопку Статус заказа
+				var phoneForOrderStatus string
+				if update.Message.Text != "" {
+					//если пользователь отправил телефон текстовым сообщением, то записываем его в переменную phoneForOrderStatus
+					phoneForOrderStatus = Text
+					tokenRemonline := remonline.Token(perm.ApiKey)
+					msg.Text = remonline.OrderStatus(tokenRemonline, phoneForOrderStatus)
+					msg.ReplyMarkup = kbrdMain
+				} else {
+					//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
+					phoneForOrderStatus = update.Message.Contact.PhoneNumber
+					tokenRemonline := remonline.Token(perm.ApiKey)
+					msg.Text = remonline.OrderStatus(tokenRemonline, phoneForOrderStatus)
+					msg.ReplyMarkup = kbrdMain
+				}
+				//удаляем из мапы запись с данными пользователя
+				delete(users, ID)
 			}
 			if _, err = bot.Send(msg); err != nil {
 				panic(err)
@@ -418,7 +423,10 @@ func main() {
 			case "/close":
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 			case perm.OrderStatus:
-				msg.Text = perm.InDev
+				msg.Text = "Введите номер телефона, указанный в заказе, не менее 10 цифр в формате 9123456789. Для отправки своего номера можете нажать кнопку ниже."
+				msg.ReplyMarkup = btnContact
+				i = 13
+				writeUDIndex(update.Message.Chat.ID) //используем функцию только для записи в поле users[ID].index значения 13
 			case perm.WriteToManager:
 				msg.Text = "Нажмите эту кнопку для перехода в чат с менеджером"
 				msg.ReplyMarkup = btnURL
@@ -466,7 +474,7 @@ func main() {
 				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
 				writeUDStart(ID, FirstName, Username)
 			case perm.NotOrganization:
-				msg.Text = perm.Adress
+				msg.Text = perm.Address
 				i = 2
 				FirstName := ud.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
 				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
@@ -592,7 +600,6 @@ func main() {
 
 			}
 		}
-
 		fmt.Println("\v", users)
 		fmt.Println("\v", ud)
 	}
