@@ -3,7 +3,7 @@ package main
 import (
 	"TG_bot_FAP/perm"
 	"TG_bot_FAP/remonline"
-	"fmt"
+	"flag"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 	"time"
@@ -51,15 +51,13 @@ var (
 		))
 )
 
-//TODO требует рестарта после перехода в чат менеджеру и возврата к боту - исправить
-
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
 var i = 0
 
 // users мапа для хранения данных пользователей
 var users = make(map[int64]user)
 
-// sliceBtnString срез для хранения значений "text" кнопок в клавиатуре getKeyboardDate
+// sliceBtnString срез для хранения значений "text" кнопок в клавиатуре kbrdDate
 var btnsKbrdDates = make([]string, 6, 6)
 
 // user структура для записи данных пользователя при вызове курьера или при записи на сервис
@@ -82,7 +80,7 @@ type blankGetCourier struct {
 	Time    string
 }
 
-// blankGetCourier структура для записи данных пользователя при вызове курьера
+// blankRecInService структура для записи данных пользователя при записи в сервис
 type blankRecInService struct {
 	Intro   string
 	Date    string
@@ -93,41 +91,49 @@ type blankRecInService struct {
 	Name    string
 }
 
-var dataGetCourier = blankGetCourier{
+var getCourierData = blankGetCourier{
 	"Спасибо! Вы ввели следующие данные: ",
 	"Учреждение (если применимо): ",
 	"Адрес, где забрать: ",
-	"Имя: ",
+	"Контактное лицо: ",
 	"Номер телефона: ",
 	"Цель вызова курьера: ",
 	"Дата, время приезда курьера: ",
 }
-var dataRecInService = blankRecInService{
+var recInServiceData = blankRecInService{
 	"Спасибо! Вы ввели следующие данные: ",
 	"Дата: ",
 	"Время: ",
 	"Устройство: ",
 	"Проблема: ",
 	"Номер телефона: ",
-	"Имя: ",
+	"Контактное лицо: ",
 }
 
-// TODO: Добавить поле для ссылки на чат
-var ud = user{
+var userData = user{
 	"Name: ",
 	"Username: ",
-	dataGetCourier,
-	dataRecInService,
+	getCourierData,
+	recInServiceData,
 	0,
 }
 
 var t = time.Now()
 
-// writeUDStart функция для создания записи пользователя в мапе с ID пользователя
-func writeUDStart(ID int64, FirstName, Username string) {
+// btnsMainMenu слайс с названиями кнопок главного меню
+var btnsMainMenu = []string{
+	perm.OrderStatus,
+	perm.WriteToManager,
+	perm.CallTheOffice,
+	perm.GetCourier,
+	perm.RecInService,
+}
+
+// writeUserData функция для создания записи пользователя в мапе с ID пользователя
+func writeUserData(ID int64, FirstName, Username string) {
 	if _, ok := users[ID]; !ok {
-		users[ID] = ud    //Если нет ключа, равного ID, то создаем элемент мапы с ключом = ID
-		temp := users[ID] //переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы,
+		users[ID] = userData //Если нет ключа, равного ID, то создаем элемент мапы с ключом = ID
+		temp := users[ID]    //переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы,
 		//т.к. изменение значения поля через users[ID].index = i языком не предусмотрено
 		temp.FirstName = FirstName //Записываем в поле имя пользователя
 		temp.Username = Username   //Записываем в поле Username пользователя
@@ -141,8 +147,8 @@ func writeUDStart(ID int64, FirstName, Username string) {
 	}
 }
 
-// writeUDIndex функция для изменения индекса в данных пользователя
-func writeUDIndex(ID int64) {
+// writeUserDataIndex функция для изменения индекса в данных пользователя
+func writeUserDataIndex(ID int64) {
 	//переменная с копией структуры, чтобы изменить значение поля структуры внутри мапы,
 	//т.к. изменение значения поля через users[ID].index = i языком не предусмотрено
 	//счетчик записываем в index
@@ -152,21 +158,18 @@ func writeUDIndex(ID int64) {
 }
 
 //TODO: Тест - запись в субботу в между 14:00 и 14:30
-//TODO: Контрольное время в константу
 
-// getKeyboardDate формирует клавиатуру из 6 инлайн кнопок, для чего создает слайс длиной 6 из строк,
+// kbrdDate формирует клавиатуру из 6 инлайн кнопок, для чего создает слайс длиной 6 из строк,
 // где каждая строка - дата для инлайн кнопки на запись в сервис
-func getKeyboardDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
-	j := 0                         // индексы сдвига даты
-	hh, mm, _ := t.Clock()         //берем часы и минуты из времени нажатия на кнопку, т.е. из текущего времени
-	timeNOW := hh*60 + mm          //текущее время в минутах с начала суток
-	cntrlTimeSat := 14 * 60        // контрольное время для субботы 14:00 - в минутах с начала суток
-	cntrlTimeWorkday := 16*60 + 30 //контрольное время для будних дней 16:30 - в минутах с начала суток
+func kbrdDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
+	j := 0                 // индексы сдвига даты
+	hh, mm, _ := t.Clock() //берем часы и минуты из времени нажатия на кнопку, т.е. из текущего времени
+	timeNOW := hh*60 + mm  //текущее время в минутах с начала суток
 	for k := 0; k < len(btnsKbrdDates); k++ {
 		l := 0 // индексы сдвига даты
 		//если время нажатия на кнопку > 16:30 (cntrlTimeWorkday) или день нажатия на кнопку - суббота и время > 14:00 (cntrlTimeSat), то
 		//увеличиваем l на единицу, чтобы пропустить сегодняшнюю дату
-		if timeNOW > cntrlTimeWorkday || (t.Weekday() == time.Saturday && timeNOW > cntrlTimeSat) {
+		if timeNOW > perm.CntrlTimeWorkday || (t.Weekday() == time.Saturday && timeNOW > perm.CntrlTimeSat) {
 			l = 1
 		}
 
@@ -195,8 +198,39 @@ func getKeyboardDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	return kbrdDates
 }
 
+// mustTokenTg - функция для получения токена телеграм бота через флаг -tgbot-token
+// для запуска из командной строки необходимо:  go run TG_bot_FAP -tgbot-token 'значение токена'   или же
+//   - go build (собираем exe-файл, если его еще нет, если есть - пропускаем эту команду)
+//   - ./TG_bot_FAP -tgbot-token 'значение токена' (запускаем exe-файл с флагом '-tgbot-token', указывая значение токена)
+func mustTokenTg() string {
+	token := flag.String(
+		"tgbot-token",
+		"",
+		"токен для доступа к телеграм боту / token for access to telegram bot",
+	)
+
+	flag.Parse()
+
+	if *token == "" {
+		log.Fatal("токен не указан / token is not specified")
+	}
+
+	return *token
+}
+
+// isCommand функция, определяющая сообщения, полученные после нажатия на кнопки главного меню
+func isCommand(text string, btnsMainMenu []string) bool {
+	b := false
+	for _, v := range btnsMainMenu {
+		if text == v {
+			b = true
+		}
+	}
+	return b
+}
+
 func main() {
-	bot, err := tgbotapi.NewBotAPI(perm.Token)
+	bot, err := tgbotapi.NewBotAPI(mustTokenTg())
 	if err != nil {
 		log.Panic(err)
 	}
@@ -213,194 +247,279 @@ func main() {
 	// Loop through each update.
 	for update := range updates {
 
-		//TODO: Добавить условие, чтобы не принимал нажатие кнопок главного меню в качестве ответов в этой ветке или убирать кнопки главного меню
+		//TODO удалить данные юзера из мапы и отрисовать ему главное меню, если он не совершает действий какое-то время
+
+		//TODO дописать проверку корректности ввода номера телефона при вызове курьера и записи в сервис, взять готовую функцию
 
 		// Опрос клиента после нажатия кнопок Вызвать курьера, Запись в сервис или Статус заказа, т.е. при условии, что user.Index > 0
 		if update.Message != nil && users[update.Message.From.ID].Index > 0 {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			ID := update.Message.Chat.ID
 			Text := update.Message.Text
+
 			switch users[update.Message.From.ID].Index {
-			case 1:
-				//записываем полученное наименование организации в поле Org
-				temp := users[ID]
-				temp.GetCourier.Org = temp.GetCourier.Org + Text
-				users[ID] = temp
-				i = 2
-				writeUDIndex(ID)
-				msg.Text = perm.Address
+			case 1: //ветка после нажатия на кнопку Вызвать курьера
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForGetCourier
+				} else {
+					//записываем полученное наименование организации в поле Org
+					temp := users[ID]
+					temp.GetCourier.Org = temp.GetCourier.Org + Text
+					users[ID] = temp
+					i = 2
+					writeUserDataIndex(ID)
+					msg.Text = perm.Address
+				}
 			case 2:
-				//записываем полученный адрес в поле Address
-				temp := users[ID]
-				temp.GetCourier.Address = temp.GetCourier.Address + Text
-				users[ID] = temp
-				i = 3
-				writeUDIndex(ID)
-				msg.Text = "Укажите имя контактного лица"
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForGetCourier
+				} else {
+					//записываем полученный адрес в поле Address
+					temp := users[ID]
+					temp.GetCourier.Address = temp.GetCourier.Address + Text
+					users[ID] = temp
+					i = 3
+					writeUserDataIndex(ID)
+					msg.Text = "Укажите имя контактного лица"
+				}
 			case 3:
-				//записываем полученное имя в поле Person
-				temp := users[ID]
-				temp.GetCourier.Person = temp.GetCourier.Person + Text
-				users[ID] = temp
-				i = 4
-				writeUDIndex(ID)
-				msg.ReplyMarkup = btnContact
-				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить свой номер телефона, к которому привязан ваш аккаунт телеграма"
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForGetCourier
+				} else {
+					//записываем полученное имя в поле Person
+					temp := users[ID]
+					temp.GetCourier.Person = temp.GetCourier.Person + Text
+					users[ID] = temp
+					i = 4
+					writeUserDataIndex(ID)
+					msg.ReplyMarkup = btnContact
+					msg.Text = perm.EnterPhone
+				}
 			case 4:
-				//записываем полученный телефон в поле Phone
-				temp := users[ID]
+				//определяем, отправлен телефон текстовым сообщением или пользователь нажал инлайн кнопку "Отправить телефон"
+				phone := "_"
 				if update.Message.Text != "" {
-					//если пользователь отправил телефон текстовым сообщением, то записываем его в поле
-					temp.GetCourier.Phone = temp.GetCourier.Phone + Text
-				} else {
-					//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
-					temp.GetCourier.Phone = temp.GetCourier.Phone + update.Message.Contact.PhoneNumber
+					phone = update.Message.Text
+				} else if update.Message.Contact != nil {
+					phone = update.Message.Contact.PhoneNumber
 				}
-				users[ID] = temp
-				i = 5
-				writeUDIndex(ID)
-				msg.ReplyMarkup = kbrdMain
-				msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
-					"\n- забрать картриджи, заправить, вернуть." +
-					"\n- купить 1 новый картридж ce285a и выставить счет." +
-					"\n- после заправки привезти акт сверки и новый счет." +
-					"\n- забрать подписанный договор." +
-					"\n...или ваш вариант"
+				//проверяем корректность введенного номера телефона
+				if !remonline.IsValidPhone(phone) {
+					msg.Text = perm.NotCorrectPhone
+					msg.ReplyMarkup = btnContact
+				} else {
+					//записываем полученный телефон в поле Phone
+					temp := users[ID]
+					if update.Message.Text != "" {
+						//если пользователь отправил телефон текстовым сообщением, то записываем его в поле
+						temp.GetCourier.Phone = temp.GetCourier.Phone + Text
+					} else {
+						//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
+						temp.GetCourier.Phone = temp.GetCourier.Phone + update.Message.Contact.PhoneNumber
+					}
+					users[ID] = temp
+					i = 5
+					writeUserDataIndex(ID)
+					msg.ReplyMarkup = kbrdMain
+					msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
+						"\n- забрать картриджи, заправить, вернуть." +
+						"\n- купить 1 новый картридж ce285a и выставить счет." +
+						"\n- после заправки привезти акт сверки и новый счет." +
+						"\n- забрать подписанный договор." +
+						"\n...или ваш вариант"
+				}
 			case 5:
-				//записываем полученную цель вызова в поле Purpose
-				temp := users[ID]
-				temp.GetCourier.Purpose = temp.GetCourier.Purpose + Text
-				users[ID] = temp
-				i = 6
-				writeUDIndex(ID)
-				msg.ReplyMarkup = kbrdMain
-				msg.Text = "Укажите удобную дату и время приезда курьера"
-			case 6:
-				//записываем полученную дату и время в поле Time
-				temp := users[ID]
-				temp.GetCourier.Time = temp.GetCourier.Time + Text
-				users[ID] = temp
-				i = 7
-				writeUDIndex(ID)
-				msg.ReplyMarkup = kbrdYN
-				//Выводим записанные данные клиента в виде сообщения
-				msg.Text = users[ID].GetCourier.Intro +
-					"\n" + users[ID].GetCourier.Org +
-					"\n" + users[ID].GetCourier.Address +
-					"\n" + users[ID].GetCourier.Person +
-					"\n" + users[ID].GetCourier.Phone +
-					"\n" + users[ID].GetCourier.Purpose +
-					"\n" + users[ID].GetCourier.Time +
-					"\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
-			case 7:
-				//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
-				msg.ChatID = perm.ManagerID
-				msg.Text = "⚡ Заявка на вызов курьера:" +
-					"\n\n" + users[ID].FirstName +
-					"\n" + users[ID].Username +
-					"\n" + users[ID].GetCourier.Org +
-					"\n" + users[ID].GetCourier.Address +
-					"\n" + users[ID].GetCourier.Person +
-					"\n" + users[ID].GetCourier.Phone +
-					"\n" + users[ID].GetCourier.Purpose +
-					"\n" + users[ID].GetCourier.Time +
-					"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
-				if _, err := bot.Send(msg); err != nil {
-					panic(err)
-
-				}
-				//удаляем из мапы запись с данными пользователя
-				delete(users, ID)
-				//отправляем сообщение пользователю
-				msg.ChatID = ID
-				msg.ReplyMarkup = kbrdMain
-				msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки.\n "
-			case 8:
-				// TODO записать проблему в структуру
-				//записываем проблему в поле Problem
-				temp := users[ID]
-				temp.RecInService.Problem = temp.RecInService.Problem + Text
-				users[ID] = temp
-				i = 9
-				writeUDIndex(ID)
-				msg.Text = "Какое у вас устройство? Например, ноутбук ACER модель ABC."
-			case 9:
-				// TODO записать устройство в структуру
-				//записываем устройство в поле Device
-				temp := users[ID]
-				temp.RecInService.Device = temp.RecInService.Device + Text
-				users[ID] = temp
-				i = 10
-				writeUDIndex(ID)
-				msg.Text = "Укажите ваше имя"
-			case 10:
-				// TODO записать имя в структуру
-				//записываем имя в поле Name
-				temp := users[ID]
-				temp.RecInService.Name = temp.RecInService.Name + Text
-				users[ID] = temp
-				i = 11
-				writeUDIndex(ID)
-				msg.ReplyMarkup = btnContact
-				msg.Text = "Введите номер телефона или нажмите кнопку, чтобы отправить номер телефона, к которому привязан ваш аккаунт телеграма"
-			case 11:
-				//TODO записываем полученный телефон в поле Phone
-				temp := users[ID]
-				if update.Message.Text != "" {
-					//если пользователь отправил телефон текстовым сообщением, то записываем его в поле
-					temp.RecInService.Phone = temp.RecInService.Phone + Text
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForGetCourier
 				} else {
-					//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
-					temp.RecInService.Phone = temp.RecInService.Phone + update.Message.Contact.PhoneNumber
+					//записываем полученную цель вызова в поле Purpose
+					temp := users[ID]
+					temp.GetCourier.Purpose = temp.GetCourier.Purpose + Text
+					users[ID] = temp
+					i = 6
+					writeUserDataIndex(ID)
+					msg.ReplyMarkup = kbrdMain
+					msg.Text = "Укажите удобную дату и время приезда курьера"
 				}
-				users[ID] = temp
-				i = 12
-				writeUDIndex(ID)
-				msg.ReplyMarkup = kbrdYNRecInService
-				//TODO Выводим записанные данные клиента в виде сообщения
-				msg.Text = users[ID].RecInService.Intro +
-					"\n" + users[ID].RecInService.Date +
-					"\n" + users[ID].RecInService.Time +
-					"\n" + users[ID].RecInService.Device +
-					"\n" + users[ID].RecInService.Problem +
-					"\n" + users[ID].RecInService.Phone +
-					"\n" + users[ID].RecInService.Name +
-					"\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
-			case 12:
-				//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
-				msg.ChatID = perm.ManagerID
-				msg.Text = "⚡ Запись на сервис:" +
-					"\n\n" + users[ID].FirstName +
-					"\n" + users[ID].Username +
-					"\n" + users[ID].RecInService.Date +
-					"\n" + users[ID].RecInService.Time +
-					"\n" + users[ID].RecInService.Device +
-					"\n" + users[ID].RecInService.Problem +
-					"\n" + users[ID].RecInService.Phone +
-					"\n" + users[ID].RecInService.Name +
-					"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
-				if _, err := bot.Send(msg); err != nil {
-					panic(err)
+			case 6:
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForGetCourier
+				} else {
+					//записываем полученную дату и время в поле Time
+					temp := users[ID]
+					temp.GetCourier.Time = temp.GetCourier.Time + Text
+					users[ID] = temp
+					i = 7
+					writeUserDataIndex(ID)
+					msg.ReplyMarkup = kbrdYN
+					//Выводим записанные данные клиента в виде сообщения
+					msg.Text = users[ID].GetCourier.Intro +
+						"\n" + users[ID].GetCourier.Org +
+						"\n" + users[ID].GetCourier.Address +
+						"\n" + users[ID].GetCourier.Person +
+						"\n" + users[ID].GetCourier.Phone +
+						"\n" + users[ID].GetCourier.Purpose +
+						"\n" + users[ID].GetCourier.Time +
+						"\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
+				}
+			case 7:
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = "Подтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись, заполняя заявку на вызов курьера"
+					msg.ReplyMarkup = kbrdYN
+				} else {
+					//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
+					msg.ChatID = perm.ManagerID
+					msg.Text = "⚡ Заявка на вызов курьера:" +
+						"\n\n" + users[ID].FirstName +
+						"\n" + users[ID].Username +
+						"\n" + users[ID].GetCourier.Org +
+						"\n" + users[ID].GetCourier.Address +
+						"\n" + users[ID].GetCourier.Person +
+						"\n" + users[ID].GetCourier.Phone +
+						"\n" + users[ID].GetCourier.Purpose +
+						"\n" + users[ID].GetCourier.Time +
+						"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
+					if _, err := bot.Send(msg); err != nil {
+						panic(err)
 
+					}
+					//удаляем из мапы запись с данными пользователя
+					delete(users, ID)
+					//отправляем сообщение пользователю
+					msg.ChatID = ID
+					msg.ReplyMarkup = kbrdMain
+					msg.Text = perm.Ok
 				}
-				//удаляем из мапы запись с данными пользователя
-				delete(users, ID)
-				//отправляем сообщение пользователю
-				msg.ChatID = ID
-				msg.ReplyMarkup = kbrdMain
-				msg.Text = "Спасибо, вы записаны на сервис\n "
+			case 8: //ветка после нажатия на кнопку Запись в сервис
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForRecInService
+				} else {
+					//записываем проблему в поле Problem
+					temp := users[ID]
+					temp.RecInService.Problem = temp.RecInService.Problem + Text
+					users[ID] = temp
+					i = 9
+					writeUserDataIndex(ID)
+					msg.Text = "Какое у вас устройство? Например, ноутбук ACER модель ABC."
+				}
+			case 9:
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForRecInService
+				} else {
+					//записываем устройство в поле Device
+					temp := users[ID]
+					temp.RecInService.Device = temp.RecInService.Device + Text
+					users[ID] = temp
+					i = 10
+					writeUserDataIndex(ID)
+					msg.Text = "Укажите ваше имя"
+				}
+			case 10:
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = perm.NotAllAnswersForRecInService
+				} else {
+					//записываем имя в поле Name
+					temp := users[ID]
+					temp.RecInService.Name = temp.RecInService.Name + Text
+					users[ID] = temp
+					i = 11
+					writeUserDataIndex(ID)
+					msg.ReplyMarkup = btnContact
+					msg.Text = perm.EnterPhone
+				}
+			case 11:
+				//определяем, отправлен телефон текстовым сообщением или пользователь нажал инлайн кнопку "Отправить телефон"
+				phone := "_"
+				if update.Message.Text != "" {
+					phone = update.Message.Text
+				} else if update.Message.Contact != nil {
+					phone = update.Message.Contact.PhoneNumber
+				}
+				//проверяем корректность введенного номера телефона
+				if !remonline.IsValidPhone(phone) {
+					msg.Text = perm.NotCorrectPhone
+					msg.ReplyMarkup = btnContact
+				} else {
+					//записываем полученный телефон в поле Phone
+					temp := users[ID]
+					if update.Message.Text != "" {
+						//если пользователь отправил телефон текстовым сообщением, то записываем его в поле
+						temp.RecInService.Phone = temp.RecInService.Phone + Text
+					} else {
+						//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
+						temp.RecInService.Phone = temp.RecInService.Phone + update.Message.Contact.PhoneNumber
+					}
+					users[ID] = temp
+					i = 12
+					writeUserDataIndex(ID)
+					msg.ReplyMarkup = kbrdYNRecInService
+					//Выводим записанные данные клиента в виде сообщения
+					msg.Text = users[ID].RecInService.Intro +
+						"\n" + users[ID].RecInService.Date +
+						"\n" + users[ID].RecInService.Time +
+						"\n" + users[ID].RecInService.Device +
+						"\n" + users[ID].RecInService.Problem +
+						"\n" + users[ID].RecInService.Phone +
+						"\n" + users[ID].RecInService.Name +
+						"\n\nПодтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись."
+				}
+			case 12:
+				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
+				if isCommand(Text, btnsMainMenu) {
+					msg.Text = "Подтвердите, если все верно, или нажмите \"Исправить\", если вы ошиблись, записываясь в сервис"
+					msg.ReplyMarkup = kbrdYN
+				} else {
+					//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
+					msg.ChatID = perm.ManagerID
+					msg.Text = "⚡ Запись на сервис:" +
+						"\n\n" + users[ID].FirstName +
+						"\n" + users[ID].Username +
+						"\n" + users[ID].RecInService.Date +
+						"\n" + users[ID].RecInService.Time +
+						"\n" + users[ID].RecInService.Device +
+						"\n" + users[ID].RecInService.Problem +
+						"\n" + users[ID].RecInService.Phone +
+						"\n" + users[ID].RecInService.Name +
+						"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
+					if _, err := bot.Send(msg); err != nil {
+						panic(err)
+
+					}
+					//удаляем из мапы запись с данными пользователя
+					delete(users, ID)
+					//отправляем сообщение пользователю
+					msg.ChatID = ID
+					msg.ReplyMarkup = kbrdMain
+					msg.Text = "Спасибо, вы записаны на сервис\n "
+				}
 			case 13: //ветка после нажатия на кнопку Статус заказа
+				msg.Text = "Секундочку, проверяю... "
+				if _, err = bot.Send(msg); err != nil {
+					panic(err)
+				}
+				tokenRemonline := remonline.TokenRmnln(perm.ApiKey) //TODO не заработал через MustApiKeyRemonline, разобраться
 				var phoneForOrderStatus string
 				if update.Message.Text != "" {
 					//если пользователь отправил телефон текстовым сообщением, то записываем его в переменную phoneForOrderStatus
 					phoneForOrderStatus = Text
-					tokenRemonline := remonline.Token(perm.ApiKey)
+					msg.Text = remonline.OrderStatus(tokenRemonline, phoneForOrderStatus)
+					msg.ReplyMarkup = kbrdMain
+				} else if update.Message.Contact != nil {
+					//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
+					phoneForOrderStatus = update.Message.Contact.PhoneNumber
 					msg.Text = remonline.OrderStatus(tokenRemonline, phoneForOrderStatus)
 					msg.ReplyMarkup = kbrdMain
 				} else {
-					//если пользователь нажал инлайн кнопку "Отправить телефон", то записываем его в поле
-					phoneForOrderStatus = update.Message.Contact.PhoneNumber
-					tokenRemonline := remonline.Token(perm.ApiKey)
+					phoneForOrderStatus = "_"
 					msg.Text = remonline.OrderStatus(tokenRemonline, phoneForOrderStatus)
 					msg.ReplyMarkup = kbrdMain
 				}
@@ -410,23 +529,23 @@ func main() {
 			if _, err = bot.Send(msg); err != nil {
 				panic(err)
 			}
-		} else if update.Message != nil {
+		} else
+
+		//ветка для обработки команд и нажатия кнопок главного меню при условии, что полученная команда не /start и что user.Index == 0
+		if update.Message != nil && update.Message.Text != "/start" && users[update.Message.From.ID].Index == 0 {
 			// Construct a new message from the given chat ID and containing
 			// the text that we received.
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 
 			// Реакция на нажатия кнопок главного меню
 			switch update.Message.Text {
-			case "/start":
-				msg.Text = "Воспользуйтесь моей встроенной клавиатурой"
-				msg.ReplyMarkup = kbrdMain
 			case "/close":
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 			case perm.OrderStatus:
-				msg.Text = "Введите номер телефона, указанный в заказе, не менее 10 цифр в формате 9123456789. Для отправки своего номера можете нажать кнопку ниже."
+				msg.Text = perm.EnterPhoneForStatus
 				msg.ReplyMarkup = btnContact
 				i = 13
-				writeUDIndex(update.Message.Chat.ID) //используем функцию только для записи в поле users[ID].index значения 13
+				writeUserDataIndex(update.Message.Chat.ID) //используем функцию только для записи в поле users[ID].index значения 13
 			case perm.WriteToManager:
 				msg.Text = "Нажмите эту кнопку для перехода в чат с менеджером"
 				msg.ReplyMarkup = btnURL
@@ -436,10 +555,10 @@ func main() {
 				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
 			case perm.RecInService:
-				msg.Text = "Выберите удобную дату"
-				msg.ReplyMarkup = getKeyboardDate(t)
+				msg.Text = perm.SelectDate
+				msg.ReplyMarkup = kbrdDate(t)
 			default:
-				msg.Text = "Я тебя не понимаю"
+				msg.Text = "Я вас не понимаю. Воспользуйтесь кнопками ниже для общения со мной ⬇️"
 			}
 
 			// Send the message.
@@ -447,6 +566,8 @@ func main() {
 				panic(err)
 			}
 		}
+
+		//Обработка нажатия инлайн-кнопок
 		if update.CallbackQuery != nil {
 			// Respond to the callback query, telling Telegram to show the user
 			// a message with the data received.
@@ -458,7 +579,7 @@ func main() {
 			msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Data)
 			ID := update.CallbackQuery.Message.Chat.ID
 
-			//чудо-костыль для получения значения data после нажатия кнопки с датой
+			//получение значения data после нажатия кнопки с датой
 			res := ""
 			for _, val := range btnsKbrdDates {
 				if update.CallbackQuery.Data == val {
@@ -470,15 +591,15 @@ func main() {
 			case perm.Organization:
 				msg.Text = perm.NameOfTheOrganization
 				i = 1
-				FirstName := ud.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUDStart(ID, FirstName, Username)
+				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				writeUserData(ID, FirstName, Username)
 			case perm.NotOrganization:
 				msg.Text = perm.Address
 				i = 2
-				FirstName := ud.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUDStart(ID, FirstName, Username)
+				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				writeUserData(ID, FirstName, Username)
 			case perm.Yes:
 				// Проверяем, что запись в мапе существует
 				if _, ok := users[ID]; ok {
@@ -503,7 +624,7 @@ func main() {
 						//пользователю выводим главное меню и шлем сообщение
 						msg.ReplyMarkup = kbrdMain
 						msg.ChatID = ID
-						msg.Text = "Спасибо, ваша заявка принята. В ближайшее время с вами свяжется менеджер по указанному телефону для подтверждения заявки."
+						msg.Text = perm.Ok
 						//удаляем из мапы запись с данными пользователя
 						delete(users, ID)
 					} else { //При повторном нажатии на кнопку "Да, все верно" и ответах не на все вопросы отработает эта ветка
@@ -516,40 +637,38 @@ func main() {
 			case perm.No:
 				//Стираем данные из полей пользователя, перезаписывая их на пустые поля
 				i = 0
-				FirstName := ud.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUDStart(ID, FirstName, Username)
+				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				writeUserData(ID, FirstName, Username)
 				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
 			case res:
-				// TODO записать дату в структуру
-				FirstName := ud.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUDStart(ID, FirstName, Username)
+				i = 0
+				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				writeUserData(ID, FirstName, Username)
 				//записываем дату в поле Date
 				temp := users[ID]
 				temp.RecInService.Date = temp.RecInService.Date + update.CallbackQuery.Data
 				users[ID] = temp
-				msg.Text = "Выберете удобное время:"   // TODO прописать сообщение в константы
+				msg.Text = "Выберете удобное время:"
 				msg.ReplyMarkup = kbrdBeforeAfterLunch //рисуем кнопки "до/после обеда"
 			case "beforeLunch":
-				// TODO записать время в структуру
 				i = 8
 				//записываем время в поле Time
 				temp := users[ID]
 				temp.RecInService.Time = temp.RecInService.Time + "До обеда"
 				users[ID] = temp
-				writeUDIndex(ID)
-				msg.Text = "Какая у вас проблема? (например, разбился экран телефона)" // TODO прописать сообщение в константы
+				writeUserDataIndex(ID)
+				msg.Text = "Какая у вас проблема? (например, разбился экран телефона)"
 			case "afterLunch":
-				// TODO записать время в структуру
 				i = 8
 				//записываем время в поле Time
 				temp := users[ID]
 				temp.RecInService.Time = temp.RecInService.Time + "После обеда"
 				users[ID] = temp
-				writeUDIndex(ID)
-				msg.Text = "Какая у вас проблема? Например, разбился экран телефона." // TODO прописать сообщение в константы
+				writeUserDataIndex(ID)
+				msg.Text = "Какая у вас проблема? Например, разбился экран телефона."
 			case "yes":
 				// Проверяем, что запись в мапе существует
 				if _, ok := users[ID]; ok {
@@ -587,11 +706,11 @@ func main() {
 			case "no":
 				//Стираем данные из полей пользователя, перезаписывая их на пустые поля
 				i = 0
-				FirstName := ud.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := ud.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUDStart(ID, FirstName, Username)
-				msg.Text = "Выберите удобную дату. Если дата попадает на праздничный день, лучше написать менеджеру или позвонить в офис для уточнения графика работы."
-				msg.ReplyMarkup = getKeyboardDate(t)
+				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
+				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
+				writeUserData(ID, FirstName, Username)
+				msg.Text = perm.SelectDate
+				msg.ReplyMarkup = kbrdDate(t)
 
 			}
 
@@ -599,8 +718,20 @@ func main() {
 				panic(err)
 
 			}
+		} else
+		//ветка для обработки команды "/start"
+		if update.Message.Text == "/start" {
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+			msg.Text = perm.StartMsg
+			msg.ReplyMarkup = kbrdMain
+			//удаляем данные клиента
+			delete(users, update.Message.Chat.ID)
+
+			if _, err = bot.Send(msg); err != nil {
+				panic(err)
+			}
 		}
-		fmt.Println("\v", users)
-		fmt.Println("\v", ud)
+
+		log.Printf("Содержимое мапы с данными пользователей users map[int64]user:::::%+v\n", users)
 	}
 }

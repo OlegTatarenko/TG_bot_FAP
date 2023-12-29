@@ -3,6 +3,7 @@ package remonline
 import (
 	"TG_bot_FAP/perm"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -11,8 +12,28 @@ import (
 	"time"
 )
 
-// Token - функция для получения токена от Ремонлайн по apiKey Смартсет
-func Token(apiKey string) string {
+// MustApiKeyRemonline - функция для получения ApiKey remonline через флаг -remonline-apikey
+// для запуска из командной строки необходимо:
+//   - go build (собираем exe-файл, если его еще нет, если есть - пропускаем эту команду)
+//   - ./TG_bot_FAP -tgbot-token 'значение токена тг бота' -remonline-apiKey 'значение apikey' (запускаем exe-файл с флагами, указывая значение токена и apikey)
+func MustApiKeyRemonline() string {
+	apiKey := flag.String(
+		"remonline-apiKey",
+		"",
+		"apiKey для доступа к remonline / apiKey for access to remonline",
+	)
+
+	flag.Parse()
+
+	if *apiKey == "" {
+		log.Fatal("apiKey не указан / apiKey is not specified")
+	}
+
+	return *apiKey
+}
+
+// TokenRmnln - функция для получения токена от Ремонлайн по apiKey Смартсет, токен действителен сутки с момента получения
+func TokenRmnln(apiKey string) string {
 	//получаем токен, используя в запросе к API Ремонлайна apiKey Смартсет (https://remonline.app/docs/api/#apisection210_546)
 	url := "https://api.remonline.app/token/new?api_key=" + apiKey
 
@@ -47,25 +68,25 @@ func Token(apiKey string) string {
 		Token string `json:"token"`
 	}
 	var T Tkn
-	//декодируем полученный json (содержимое переменной body - срез байт), записываем токен в переменную Token
+	//декодируем полученный json (содержимое переменной body - срез байт), записываем токен в переменную T
 	if err = json.Unmarshal(body, &T); err != nil {
 		log.Fatalln(err)
 		//return
 	}
 	// этот вариант лучше на случай некорректных данных в json, но он выдает EOF, не разобрался
-	//err = json.NewDecoder(resp.Body).Decode(&Token)
+	//err = json.NewDecoder(resp.Body).Decode(&T)
 	//if err != nil {
 	//	log.Fatalln(err)
 	//}
-	//возвращаем значение Token
+	//возвращаем значение токен
 	return T.Token
 }
 
-// IsValidPhone - функция, проверяющая корректность ввода номера телефона: допустимы цифры, знак +, не менее 10 символов
+// IsValidPhone - функция, проверяющая корректность ввода номера телефона: допустимы цифры, знак +, не менее 11 символов
 func IsValidPhone(phone string) bool {
 	res := false
-	//приводим строку к срезу рун, если его длина < 10, то номер введен некорректно
-	if len([]rune(phone)) < 10 {
+	//приводим строку к срезу рун, если его длина < 11, то номер введен некорректно
+	if len([]rune(phone)) < 11 {
 		return res
 	} else {
 		for _, val := range phone {
@@ -81,8 +102,8 @@ func IsValidPhone(phone string) bool {
 	}
 }
 
-// TitleOfStatus - функция для выбора варианта заголовков в ответе бота перед статусом заказа/ов
-func TitleOfStatus(nmbrOfOrders int, nmbrOfOutputOrders int) string {
+// titleOfStatus - функция для выбора варианта заголовков в ответе бота перед статусом заказа/ов
+func titleOfStatus(nmbrOfOrders int, nmbrOfOutputOrders int) string {
 	var title string
 	switch nmbrOfOrders {
 	case 1:
@@ -97,8 +118,8 @@ func TitleOfStatus(nmbrOfOrders int, nmbrOfOutputOrders int) string {
 	return title
 }
 
-// DescriptionOfStatus - функция для присвоения каждой группе статуса словесного описания
-func DescriptionOfStatus(statusGroup int) string {
+// descriptionOfStatus - функция для присвоения каждой группе статуса словесного описания
+func descriptionOfStatus(statusGroup int) string {
 	var status string
 	switch statusGroup {
 	case 0:
@@ -127,7 +148,7 @@ func DescriptionOfStatus(statusGroup int) string {
 func OrderStatus(token, phone string) string {
 	output := ""
 	if !IsValidPhone(phone) {
-		output = "Номер телефона указан некорректно 🙁\n"
+		output = perm.NotCorrectPhone
 	} else {
 		//получаем из списка клиентов данные по конкретному клиенту,
 		// используя в запросе к API Ремонлайна номер телефона клиента и сортировку по убыванию номеров заказов (https://remonline.app/docs/api/#apisection212)
@@ -271,7 +292,7 @@ func OrderStatus(token, phone string) string {
 		//иначе в цикле выводим данные по первым (в количестве perm.NmbrOfOutputOrders) заказам из слайса Data[], который содержит данные по заказам
 
 		if len(User.Data) == 0 {
-			output = "Заказы по указанным данным не найдены\n"
+			output = "Заказы по указанным данным не найдены 🤷‍♂️\n"
 		} else {
 			var status string
 			for i := 0; i < len(User.Data); i++ {
@@ -280,10 +301,10 @@ func OrderStatus(token, phone string) string {
 					break
 				}
 				// каждой группе статуса соотносим словесное описание
-				status = DescriptionOfStatus(User.Data[i].Status.Group)
+				status = descriptionOfStatus(User.Data[i].Status.Group)
 				// выбираем вариант заголовка в ответе бота перед статусом заказа/ов
 				if i == 0 {
-					output = TitleOfStatus(len(User.Data), perm.NmbrOfOutputOrders)
+					output = titleOfStatus(len(User.Data), perm.NmbrOfOutputOrders)
 					//switch len(User.Data) {
 					//case 1:
 					//	output = "Статус заказа ℹ\n"
