@@ -1,3 +1,4 @@
+//имя модуля не имзенено на tgbot_Smartset
 module TG_bot_FAP
 
 go 1.19
