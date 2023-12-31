@@ -1,11 +1,11 @@
 package main
 
 import (
-	"TG_bot_FAP/perm"
-	"TG_bot_FAP/remonline"
 	"flag"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"tgbot_Smartset/perm"
+	"tgbot_Smartset/remonline"
 	"time"
 )
 

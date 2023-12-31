@@ -1,7 +1,6 @@
 package remonline
 
 import (
-	"TG_bot_FAP/perm"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"tgbot_Smartset/perm"
 	"time"
 )
 
