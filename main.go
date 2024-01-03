@@ -199,9 +199,9 @@ func kbrdDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
 }
 
 // mustTokenTg - функция для получения токена телеграм бота через флаг -tgbot-token
-// для запуска из командной строки необходимо:  go run TG_bot_FAP -tgbot-token 'значение токена'   или же
+// для запуска из командной строки необходимо:  go run tgbot_Smartset -tgbot-token 'значение токена'   или же
 //   - go build (собираем exe-файл, если его еще нет, если есть - пропускаем эту команду)
-//   - ./TG_bot_FAP -tgbot-token 'значение токена' (запускаем exe-файл с флагом '-tgbot-token', указывая значение токена)
+//   - ./tgbot_Smartset -tgbot-token 'значение токена' (запускаем exe-файл с флагом '-tgbot-token', указывая значение токена)
 func mustTokenTg() string {
 	token := flag.String(
 		"tgbot-token",
@@ -230,7 +230,7 @@ func isCommand(text string, btnsMainMenu []string) bool {
 }
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI(mustTokenTg())
+	bot, err := tgbotapi.NewBotAPI(perm.Token)
 	if err != nil {
 		log.Panic(err)
 	}
