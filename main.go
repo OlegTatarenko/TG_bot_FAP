@@ -49,6 +49,19 @@ var (
 			tgbotapi.NewInlineKeyboardButtonData("До обеда (9:00-13:00)", "beforeLunch"),
 			tgbotapi.NewInlineKeyboardButtonData("После обеда (13:00 - 18:00)", "afterLunch"),
 		))
+	kbrdWhatProlbem = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(perm.ScreenBroken, perm.ScreenBroken),
+			tgbotapi.NewInlineKeyboardButtonData(perm.Rebooting, perm.Rebooting),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(perm.Slow, perm.Slow),
+			tgbotapi.NewInlineKeyboardButtonData(perm.QuicklyDischarges, perm.QuicklyDischarges),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(perm.DoesntTurnOn, perm.DoesntTurnOn),
+			tgbotapi.NewInlineKeyboardButtonData(perm.NoNetwork, perm.NoNetwork),
+		))
 )
 
 // Счетчик для вывода инлайн-кнопок и записи данных пользователя
@@ -119,6 +132,18 @@ var userData = user{
 }
 
 var t = time.Now()
+
+// для тестирования функции kbrdDate
+//var t = time.Date(
+//	2024,         // год
+//	time.January, // месяц
+//	6,            // день
+//	14,           // часы
+//	15,           // минуты
+//	00,           // секунды
+//	00,           // наносекунды
+//	time.UTC,     // временная зона
+//)
 
 // btnsMainMenu слайс с названиями кнопок главного меню
 var btnsMainMenu = []string{
@@ -323,13 +348,14 @@ func main() {
 					users[ID] = temp
 					i = 5
 					writeUserDataIndex(ID)
-					msg.ReplyMarkup = kbrdMain
 					msg.Text = "Для чего вызываете курьера? Например, часто указывают:" +
 						"\n- забрать картриджи, заправить, вернуть." +
 						"\n- купить 1 новый картридж ce285a и выставить счет." +
 						"\n- после заправки привезти акт сверки и новый счет." +
 						"\n- забрать подписанный договор." +
 						"\n...или ваш вариант"
+					//скрываем кнопку Отправить номер
+					msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				}
 			case 5:
 				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
@@ -342,7 +368,7 @@ func main() {
 					users[ID] = temp
 					i = 6
 					writeUserDataIndex(ID)
-					msg.ReplyMarkup = kbrdMain
+					//msg.ReplyMarkup = kbrdMain
 					msg.Text = "Укажите удобную дату и время приезда курьера"
 				}
 			case 6:
@@ -385,23 +411,29 @@ func main() {
 						"\n" + users[ID].GetCourier.Purpose +
 						"\n" + users[ID].GetCourier.Time +
 						"\n\n" + "Свяжитесь с клиентом для подтверждения заявки"
-					if _, err := bot.Send(msg); err != nil {
+					if _, err = bot.Send(msg); err != nil {
 						panic(err)
-
 					}
-					//удаляем из мапы запись с данными пользователя
-					delete(users, ID)
-					//отправляем сообщение пользователю
+					//отправляем пользователю фото с подписью
+					mesg := tgbotapi.NewPhoto(ID, tgbotapi.FilePath(perm.ImgOk))
+					mesg.Caption = perm.CaptionOk
+					if _, err = bot.Send(mesg); err != nil {
+						panic(err)
+					}
+					//текст сообщения пользователю
+					msg.Text = perm.Ok
+					//отрисовка главного меню пользователю
 					msg.ChatID = ID
 					msg.ReplyMarkup = kbrdMain
-					msg.Text = perm.Ok
+					//удаляем из мапы запись с данными пользователя
+					delete(users, ID)
 				}
 			case 8: //ветка после нажатия на кнопку Запись в сервис
 				//если вместо ввода данных нажали кнопку главного меню, то не принимаем этот ответ
 				if isCommand(Text, btnsMainMenu) {
 					msg.Text = perm.NotAllAnswersForRecInService
 				} else {
-					//записываем проблему в поле Problem
+					//пользователь ввел свой текст проблемы, записываем проблему в поле Problem
 					temp := users[ID]
 					temp.RecInService.Problem = temp.RecInService.Problem + Text
 					users[ID] = temp
@@ -480,7 +512,7 @@ func main() {
 				} else {
 					//если НЕ НАЖАТА кнопка "Да, все верно" и отправлено какое-либо сообщение, то отправляем сообщение менеджеру с записанными данными
 					msg.ChatID = perm.ManagerID
-					msg.Text = "⚡ Запись на сервис:" +
+					msg.Text = "⚡ Запись в сервис:" +
 						"\n\n" + users[ID].FirstName +
 						"\n" + users[ID].Username +
 						"\n" + users[ID].RecInService.Date +
@@ -494,12 +526,19 @@ func main() {
 						panic(err)
 
 					}
-					//удаляем из мапы запись с данными пользователя
-					delete(users, ID)
-					//отправляем сообщение пользователю
+					//отправляем пользователю фото с подписью
+					mesg := tgbotapi.NewPhoto(ID, tgbotapi.FilePath(perm.ImgOk))
+					mesg.Caption = perm.CaptionOk
+					if _, err = bot.Send(mesg); err != nil {
+						panic(err)
+					}
+					//текст сообщения пользователю
+					msg.Text = perm.Ok
+					//отрисовка главного меню пользователю
 					msg.ChatID = ID
 					msg.ReplyMarkup = kbrdMain
-					msg.Text = perm.Ok
+					//удаляем из мапы запись с данными пользователя
+					delete(users, ID)
 				}
 			case 13: //ветка после нажатия на кнопку Статус заказа
 				msg.Text = "Секундочку, проверяю... "
@@ -579,11 +618,19 @@ func main() {
 			msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Data)
 			ID := update.CallbackQuery.Message.Chat.ID
 
-			//получение значения data после нажатия кнопки с датой
-			res := ""
+			//получение значения data после нажатия одной из кнопок с датой
+			dataKbrdDates := ""
 			for _, val := range btnsKbrdDates {
 				if update.CallbackQuery.Data == val {
-					res = val
+					dataKbrdDates = val
+				}
+			}
+
+			//получение значения data после нажатия одной из кнопок с типовой проблемой
+			dataKbrdWhatProblem := ""
+			for _, val := range perm.BtnsWhatProblem {
+				if update.CallbackQuery.Data == val {
+					dataKbrdWhatProblem = val
 				}
 			}
 
@@ -594,12 +641,16 @@ func main() {
 				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
 				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
 				writeUserData(ID, FirstName, Username)
+				//скрываем кнопки главного меню
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 			case perm.NotOrganization:
 				msg.Text = perm.Address
 				i = 2
 				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
 				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
 				writeUserData(ID, FirstName, Username)
+				//скрываем кнопки главного меню
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 			case perm.Yes:
 				// Проверяем, что запись в мапе существует
 				if _, ok := users[ID]; ok {
@@ -621,10 +672,17 @@ func main() {
 						if _, err := bot.Send(msg); err != nil {
 							panic(err)
 						}
-						//пользователю выводим главное меню и шлем сообщение
-						msg.ReplyMarkup = kbrdMain
-						msg.ChatID = ID
+						//отправляем пользователю фото с подписью
+						mesg := tgbotapi.NewPhoto(ID, tgbotapi.FilePath(perm.ImgOk))
+						mesg.Caption = perm.CaptionOk
+						if _, err = bot.Send(mesg); err != nil {
+							panic(err)
+						}
+						//текст сообщения пользователю
 						msg.Text = perm.Ok
+						//отрисовка главного меню пользователю
+						msg.ChatID = ID
+						msg.ReplyMarkup = kbrdMain
 						//удаляем из мапы запись с данными пользователя
 						delete(users, ID)
 					} else { //При повторном нажатии на кнопку "Да, все верно" и ответах не на все вопросы отработает эта ветка
@@ -636,13 +694,10 @@ func main() {
 				}
 			case perm.No:
 				//Стираем данные из полей пользователя, перезаписывая их на пустые поля
-				i = 0
-				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUserData(ID, FirstName, Username)
+				delete(users, ID)
 				msg.Text = perm.AreYouOrg
 				msg.ReplyMarkup = kbrdYNOrg
-			case res:
+			case dataKbrdDates:
 				i = 0
 				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
 				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
@@ -654,21 +709,47 @@ func main() {
 				msg.Text = "Выберете удобное время:"
 				msg.ReplyMarkup = kbrdBeforeAfterLunch //рисуем кнопки "до/после обеда"
 			case "beforeLunch":
+				msg.Text = "Какая у вас проблема?"
+				//скрываем кнопки главного меню
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+				if _, err = bot.Send(msg); err != nil {
+					panic(err)
+				}
 				i = 8
 				//записываем время в поле Time
 				temp := users[ID]
 				temp.RecInService.Time = temp.RecInService.Time + "До обеда"
 				users[ID] = temp
 				writeUserDataIndex(ID)
-				msg.Text = "Какая у вас проблема? (например, разбился экран телефона)"
+				msg.Text = "Выберите из списка или укажите свою."
+				//показываем инлайн-кнопки с вариантами проблемы
+				msg.ReplyMarkup = kbrdWhatProlbem
 			case "afterLunch":
+				msg.Text = "Какая у вас проблема?"
+				//скрываем кнопки главного меню
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+				if _, err = bot.Send(msg); err != nil {
+					panic(err)
+				}
 				i = 8
 				//записываем время в поле Time
 				temp := users[ID]
 				temp.RecInService.Time = temp.RecInService.Time + "После обеда"
 				users[ID] = temp
 				writeUserDataIndex(ID)
-				msg.Text = "Какая у вас проблема? Например, разбился экран телефона."
+				msg.Text = "Выберите из списка или укажите свою."
+				//показываем инлайн-кнопки с вариантами проблемы
+				msg.ReplyMarkup = kbrdWhatProlbem
+			case dataKbrdWhatProblem:
+				// если выбрана типовая проблема нажатием инлайн-кнопки, записываем проблему в поле Problem
+				temp := users[ID]
+				temp.RecInService.Problem = temp.RecInService.Problem + update.CallbackQuery.Data
+				users[ID] = temp
+				i = 9
+				writeUserDataIndex(ID)
+				msg.Text = "Какое у вас устройство? Например, ноутбук ACER модель ABC."
+				//скрываем кнопки главного меню
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 			case "yes":
 				// Проверяем, что запись в мапе существует
 				if _, ok := users[ID]; ok {
@@ -690,10 +771,17 @@ func main() {
 						if _, err := bot.Send(msg); err != nil {
 							panic(err)
 						}
-						//пользователю выводим главное меню и шлем сообщение
-						msg.ReplyMarkup = kbrdMain
-						msg.ChatID = ID
+						//отправляем пользователю фото с подписью
+						mesg := tgbotapi.NewPhoto(ID, tgbotapi.FilePath(perm.ImgOk))
+						mesg.Caption = perm.CaptionOk
+						if _, err = bot.Send(mesg); err != nil {
+							panic(err)
+						}
+						//текст сообщения пользователю
 						msg.Text = perm.Ok
+						//отрисовка главного меню пользователю
+						msg.ChatID = ID
+						msg.ReplyMarkup = kbrdMain
 						//удаляем из мапы запись с данными пользователя
 						delete(users, ID)
 					} else { //При повторном нажатии на кнопку "Да, все верно" и ответах не на все вопросы отработает эта ветка
@@ -705,10 +793,7 @@ func main() {
 				}
 			case "no":
 				//Стираем данные из полей пользователя, перезаписывая их на пустые поля
-				i = 0
-				FirstName := userData.FirstName + update.CallbackQuery.From.FirstName    //Записываем в поле имя пользователя
-				Username := userData.Username + "@" + update.CallbackQuery.From.UserName //Записываем в поле Username пользователя
-				writeUserData(ID, FirstName, Username)
+				delete(users, ID)
 				msg.Text = perm.SelectDate
 				msg.ReplyMarkup = kbrdDate(t)
 
@@ -719,19 +804,21 @@ func main() {
 
 			}
 		} else
+
 		//ветка для обработки команды "/start"
 		if update.Message.Text == "/start" {
+			//отправляем сообщение
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			msg.Text = perm.StartMsg
 			msg.ReplyMarkup = kbrdMain
-			//удаляем данные клиента
-			delete(users, update.Message.Chat.ID)
-
 			if _, err = bot.Send(msg); err != nil {
 				panic(err)
 			}
+			//удаляем данные клиента
+			delete(users, update.Message.Chat.ID)
 		}
 
 		log.Printf("Содержимое мапы с данными пользователей users map[int64]user:::::%+v\n", users)
+
 	}
 }

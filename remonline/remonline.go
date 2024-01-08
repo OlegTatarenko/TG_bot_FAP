@@ -112,6 +112,12 @@ func titleOfStatus(nmbrOfOrders int, nmbrOfOutputOrders int) string {
 		title = "Найдено 2 заказа ℹ\n"
 	case 3:
 		title = "Найдено 3 заказа ℹ\n"
+	case 4:
+		title = "Найдено 4 заказа ℹ\n"
+	case 5:
+		title = "Найдено 5 заказов ℹ\n"
+	case 6:
+		title = "Найдено 6 заказов ℹ\n"
 	default:
 		title = "Найдено заказов: " + strconv.Itoa(nmbrOfOrders) + "\nПокажу последние " + strconv.Itoa(nmbrOfOutputOrders) + " ℹ\n"
 	}
