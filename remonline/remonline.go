@@ -12,24 +12,16 @@ import (
 	"time"
 )
 
-// MustApiKeyRemonline - функция для получения ApiKey remonline через флаг -remonline-apikey
 // для запуска из командной строки необходимо:
-//   - go build (собираем exe-файл, если его еще нет, если есть - пропускаем эту команду)
-//   - ./TG_bot_FAP -tgbot-token 'значение токена тг бота' -remonline-apiKey 'значение apikey' (запускаем exe-файл с флагами, указывая значение токена и apikey)
-func MustApiKeyRemonline() string {
-	apiKey := flag.String(
-		"remonline-apiKey",
-		"",
-		"apiKey для доступа к remonline / apiKey for access to remonline",
-	)
+//   - go build (собираем исполняемый файл, если его еще нет, если есть - пропускаем эту команду)
+//   - ./tgbot_Smartset -tgbot-token 'значение токена тг бота' -remonline-apiKey 'значение apikey' (запускаем exe-файл с флагами, указывая значение токена и apikey)
 
-	flag.Parse()
+// FlagApiKey переменная, к которой привяжем флаг remonline-apikey
+var FlagApiKey string
 
-	if *apiKey == "" {
-		log.Fatal("apiKey не указан / apiKey is not specified")
-	}
-
-	return *apiKey
+// Init функция, привязывающая флаг remonline-apikey к переменной FlagApiKey
+func Init() {
+	flag.StringVar(&FlagApiKey, "remonline-apikey", "", "apikey для доступа к remonline / apikey for access to remonline")
 }
 
 // TokenRmnln - функция для получения токена от Ремонлайн по apiKey Смартсет, токен действителен сутки с момента получения

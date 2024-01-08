@@ -229,9 +229,9 @@ func kbrdDate(t time.Time) tgbotapi.InlineKeyboardMarkup {
 //   - ./tgbot_Smartset -tgbot-token 'значение токена' (запускаем exe-файл с флагом '-tgbot-token', указывая значение токена)
 func mustTokenTg() string {
 	token := flag.String(
-		"tgbot-token",
-		"",
-		"токен для доступа к телеграм боту / token for access to telegram bot",
+		"tgbot-token", //название флага
+		"",            //значение флага по умолчанию
+		"токен для доступа к телеграм боту / token for access to telegram bot", //информация о флаге
 	)
 
 	flag.Parse()
@@ -255,7 +255,11 @@ func isCommand(text string, btnsMainMenu []string) bool {
 }
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI(perm.Token)
+	//выполняем функцию Init для привязки флага remonline-apikey к переменной FlagApiKey
+	remonline.Init()
+
+	//создаем сущность бот (переменную bot), используя токен, получаемый через функцию mustTokenTg
+	bot, err := tgbotapi.NewBotAPI(mustTokenTg())
 	if err != nil {
 		log.Panic(err)
 	}
@@ -545,7 +549,7 @@ func main() {
 				if _, err = bot.Send(msg); err != nil {
 					panic(err)
 				}
-				tokenRemonline := remonline.TokenRmnln(perm.ApiKey) //TODO не заработал через MustApiKeyRemonline, разобраться
+				tokenRemonline := remonline.TokenRmnln(remonline.FlagApiKey) //TODO не заработал через MustApiKeyRemonline, разобраться
 				var phoneForOrderStatus string
 				if update.Message.Text != "" {
 					//если пользователь отправил телефон текстовым сообщением, то записываем его в переменную phoneForOrderStatus
